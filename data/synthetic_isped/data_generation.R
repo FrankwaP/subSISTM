@@ -52,5 +52,5 @@ simul <- function(individus = ind, k = 5, df = dataframe, µ0 = mu0, µ1 = mu1, 
     return(df)
 }
 dataframe <- simul()
-plot(time, dataframe[dataframe$individus == 4, ]$y_obs, type = "l")
-write.csv(dataframe, paste(this.dir(), "/simulation.csv", sep = ""))
+# plot(time, dataframe[dataframe$individus == 4, ]$y_obs, type = "l")
+write.csv2(x=dataframe, file=paste(this.dir(), "/simulation.csv", sep = ""), row.names=FALSE)
