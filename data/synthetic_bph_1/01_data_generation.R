@@ -16,7 +16,7 @@ dataframe <- rev(expand.grid(rev(l)))
 colnames(dataframe) <- c("individus", "temps")
 
 # 10 individus par group
-dataframe$groupes <- ceiling(dataframe$individus / N_ind_per_grp)
+dataframe$group <- ceiling(dataframe$individus / N_ind_per_grp)
 N_grps <- length(unique(dataframe$group))
 
 # Epsilon
@@ -59,9 +59,9 @@ simul <- function(
     df <- df %>%
         mutate(x8 = ifelse(df$individus %% 2 == 0, 1, 0))
 
-    df$y_mixed <- gamma[df$groupes, 1, drop = FALSE] +
-        gamma[df$groupes, 2, drop = FALSE] * df$x1 * df$x5 +
-        gamma[df$groupes, 3, drop = FALSE] * df$x2 * df$x6
+    df$y_mixed <- gamma[df$group, 1, drop = FALSE] +
+        gamma[df$group, 2, drop = FALSE] * df$x1 * df$x5 +
+        gamma[df$group, 3, drop = FALSE] * df$x2 * df$x6
     df$y_mixed_obs <- df$y_mixed + rnorm(length(df$y_mixed), 0, sigeps[8])
 
     df$y_fixed <- gamma[1, 1] +
