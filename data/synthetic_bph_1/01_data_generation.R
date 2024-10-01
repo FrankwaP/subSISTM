@@ -4,41 +4,29 @@ library(this.path)
 
 set.seed(13092001)
 
-N_ind <- 500
-N_time <- 50
-N_ind_per_grp <- 10
-
-ind <- 1:N_ind
-time <- 0:N_time
-
+ind <- 1:500
+time <- 0:50
 l <- list(ind, time)
 dataframe <- rev(expand.grid(rev(l)))
 colnames(dataframe) <- c("individus", "temps")
-
-# 10 individus par group
-dataframe$group <- ceiling(dataframe$individus / N_ind_per_grp)
-N_grps <- length(unique(dataframe$group))
-
+k <- 8
 # Epsilon
 sigma_epsilon <- c(1.5, 0.1, 0.1, 0.1, 0.02, 0.5, 0.01, 0.1)
-
 # X
-k <- 8
 mu0 <- runif(k, -1, 1)
 sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
+
 mu1 <- runif(k, -1, 1)
 sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 1, 0.5, 0.5))
 
 # Y
-mgamma <- c(0, 0, 0)
+mgamma <- numeric(3)
 sdgamma <- diag(c(0.5, 0.5, 0.05))
-g <- mvrnorm(N_grps, mgamma, sdgamma)
+g <- mvrnorm(length(ind), mgamma, sdgamma)
 
 simul <- function(
-    individus = ind, k = 5, df = dataframe,
-    µ0 = mu0, µ1 = mu1, sigma0 = sig0,
+    individus = ind, k = 5, df = dataframe, µ0 = mu0, µ1 = mu1, sigma0 = sig0,
     sigma1 = sig1, gamma = g, sigeps = sigma_epsilon) {
-    ####
     alpha0 <- mvrnorm(length(individus), µ0, sigma0)
     alpha1 <- mvrnorm(length(individus), µ1, sigma1)
 
@@ -59,19 +47,22 @@ simul <- function(
     df <- df %>%
         mutate(x8 = ifelse(df$individus %% 2 == 0, 1, 0))
 
-    df$y_mixed <- gamma[df$group, 1, drop = FALSE] +
-        gamma[df$group, 2, drop = FALSE] * df$x1 * df$x5 +
-        gamma[df$group, 3, drop = FALSE] * df$x2 * df$x6
+    df$y_mixed <- gamma[df$individus, 1] +
+        gamma[df$individus, 2] * df$x1 * df$x5 +
+        gamma[df$individus, 3] * df$x2 * df$x6
+
     df$y_mixed_obs <- df$y_mixed + rnorm(length(df$y_mixed), 0, sigeps[8])
+
 
     df$y_fixed <- gamma[1, 1] +
         gamma[1, 2] * df$x1 * df$x5 +
         gamma[1, 3] * df$x2 * df$x6
+
+
     df$y_fixed_obs <- df$y_fixed + rnorm(length(df$y_fixed), 0, sigeps[8])
 
     return(df)
 }
-
 dataframe <- simul()
 
 write.csv2(x = dataframe, file = paste(this.dir(), "/simulation.csv", sep = ""), row.names = FALSE)
