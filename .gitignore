@@ -4,6 +4,11 @@ __pycache__/
 *$py.class
 .vscode
 
+#Workspace R
+.RData
+.Rhistory
+
+
 # C extensions
 *.so
 
