@@ -6,7 +6,7 @@ set.seed(13092001)
 
 N_ind <- 500
 N_time <- 50
-N_ind_per_grp <- 100
+N_ind_per_grp <- 10
 
 ind <- 1:N_ind
 time <- 0:N_time
