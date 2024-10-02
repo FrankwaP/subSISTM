@@ -11,7 +11,7 @@ dataframe <- rev(expand.grid(rev(l)))
 colnames(dataframe) <- c("individus", "temps")
 k <- 8
 # Epsilon
-sigma_epsilon <- c(1.5, 0.1, 0.1, 0.1, 0.02, 0.5, 0.01, 0.1)
+sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.002, 0.05, 0.005, 0.1)
 # X
 mu0 <- runif(k, -1, 1)
 sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
