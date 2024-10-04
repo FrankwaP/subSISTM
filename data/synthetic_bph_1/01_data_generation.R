@@ -20,15 +20,18 @@ mu1 <- runif(k, -1, 1)
 sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 1, 0.5, 0.5))
 
 # Y
-mgamma <- numeric(3)
+mgamma <- runif(3, -1, 1)
 sdgamma <- diag(c(0.5, 0.5, 0.05))
-g <- mvrnorm(length(ind), mgamma, sdgamma)
+
 
 simul <- function(
     individus = ind, k = 5, df = dataframe, µ0 = mu0, µ1 = mu1, sigma0 = sig0,
-    sigma1 = sig1, gamma = g, sigeps = sigma_epsilon) {
+    sigma1 = sig1, µg = mgamma, sigmag = sdgamma, sigeps = sigma_epsilon) {
+  
     alpha0 <- mvrnorm(length(individus), µ0, sigma0)
     alpha1 <- mvrnorm(length(individus), µ1, sigma1)
+    g_mixed <- mvrnorm(length(ind), µg, sigmag)
+    g_fixed <- mvrnorm(length(ind), µg, diag(numeric(3)))
 
     df$x1 <- alpha0[df$individus, 1] + alpha1[df$individus, 1] * df$temps
     df$x1_obs <- df$x1 + rnorm(length(df$x1), 0, sigeps[1])
@@ -47,16 +50,16 @@ simul <- function(
     df <- df %>%
         mutate(x8 = ifelse(df$individus %% 2 == 0, 1, 0))
 
-    df$y_mixed <- gamma[df$individus, 1] +
-        gamma[df$individus, 2] * df$x1 * df$x5 +
-        gamma[df$individus, 3] * df$x2 * df$x6
+    df$y_mixed <- g_mixed[df$individus, 1] +
+        g_mixed[df$individus, 2] * df$x1 * df$x5 +
+        g_mixed[df$individus, 3] * df$x2 * df$x6
 
     df$y_mixed_obs <- df$y_mixed + rnorm(length(df$y_mixed), 0, sigeps[8])
 
 
-    df$y_fixed <- gamma[1, 1] +
-        gamma[1, 2] * df$x1 * df$x5 +
-        gamma[1, 3] * df$x2 * df$x6
+    df$y_fixed <- g_fixed[df$individus, 1] + 
+      g_fixed[df$individus, 2] * df$x1 * df$x5 + 
+      g_fixed[df$individus, 3] * df$x2 * df$x6
 
 
     df$y_fixed_obs <- df$y_fixed + rnorm(length(df$y_fixed), 0, sigeps[8])
