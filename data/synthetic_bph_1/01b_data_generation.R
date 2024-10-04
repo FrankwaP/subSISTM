@@ -91,10 +91,8 @@ for (k in 1:num_simulations) {
   res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
 }
 res <- data.frame(matrix(unlist(res), nrow=length(res), byrow=TRUE))
-colnames(res) <- c('µ Gamma1', 'Biais µ Gamma 1', 
-                   'µ Gamma2', 'Biais µ Gamma 2', 
-                   'µ Gamma3', 'Biais µ Gamma3',
-                   'sigma Gamma1', 'Biais sigma Gamma1',
-                   'sigma Gamma2', 'Biais sigma Gamma 2', 
-                   'sigma Gamma3', 'Biais sigma Gamma3')
+colnames(res) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
+                   'Biais µ Gamma 1', 'Biais µ Gamma 2', 'Biais µ Gamma3',
+                   'sigma Gamma1', 'sigma Gamma2', 'sigma Gamma3',
+                   'Biais sigma Gamma1', 'Biais sigma Gamma 2', 'Biais sigma Gamma3')
 print(res)
