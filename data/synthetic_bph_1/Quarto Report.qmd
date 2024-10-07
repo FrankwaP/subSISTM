@@ -98,18 +98,25 @@ write.csv2(x = Dtest, file = paste(this.dir(), "/Simulations/01_test.csv", sep="
 ```{r, echo:false}
 num_simulations <- 3
 res <- list()
+mse_oracle <- list()
 for (k in 1:num_simulations) {
   Dtrain <- simul()
   write.csv2(x = Dtrain, file = paste(this.dir(), "/Simulations/simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)
+  
   oracle_mixed <- lmer(y_mixed_obs ~ x1_x5 + x2_x6 + (x1_x5 + x2_x6|individus),
                        data = Dtrain)
-  sum <- summary(oracle_mixed)
+  sum_oracle <- summary(oracle_mixed)
   
-  beta_k <- sum$coefficients[,'Estimate']
-  sigma_k <- diag(sum$varcor$individus)
+  beta_k <- sum_oracle$coefficients[,'Estimate']
+  sigma_k <- diag(sum_oracle$varcor$individus)
   biais_beta <- beta_k - µ_gamma
   biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
   res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
+  
+  mse_oracle[k] <- mean(sum_oracle$residuals^2)
+  
+  naif_mixed <- lmer(y_mixed_obs ~ temps + temps^2 + (temps + temps^2|individus),
+                       data = Dtrain)
 }
 res <- data.frame(matrix(unlist(res), nrow=length(res), byrow=TRUE))
 colnames(res) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
@@ -120,4 +127,8 @@ colnames(res) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
 
 ```{r, echo:false}
 print(colMeans(res))
+```
+
+```{r}
+print(mse_oracle)
 ```
