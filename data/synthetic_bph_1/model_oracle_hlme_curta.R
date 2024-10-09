@@ -90,7 +90,7 @@ write.csv2(x = Dtest, file = "01_test.csv", row.names = FALSE)
 ## Génération des datasets d'entrainement
 
 
-num_simulations <- 1
+num_simulations <- 100
 res <- list()
 mse_train_oracle <- list()
 mse_test_oracle <- list()
@@ -106,7 +106,7 @@ for (k in 1:num_simulations) {
   oracle_mixed <- hlme(y_mixed_obs ~ x1_x5 + x2_x6,
                        random=~ x1_x5 + x2_x6,
                        data= Dtrain, subject='individus',
-                       nproc = 6)
+                       nproc = 15)
   save(oracle_mixed, file = paste("oracle", as.character(k) ,".rda", sep = ""))
   
   beta_k <- oracle_mixed$best[1:3]

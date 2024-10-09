@@ -17,32 +17,35 @@ library(lcmm)
 ## Import des résultats
 
 ```{r, echo: false}
-MAE_train <- read.csv2(file = paste(this.dir(), "/Résultats R script/MAE train.csv", sep = ""), sep=',')
-MAE_test <- read.csv2(file = paste(this.dir(), "/Résultats R script/MAE test.csv", sep = ""), sep=',')
-MSE_train <- read.csv2(file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""), sep=',')
-MSE_test <- read.csv2(file = paste(this.dir(), "/Résultats R script/MsE train.csv", sep = ""), sep = ',')
-Valeurs_Biais <- read.csv2(file = paste(this.dir(), "/Résultats R script/Valeurs et Biais.csv", sep = ""), sep = ',')
+MAE_train <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE train.csv", sep = ""), sep=',')
+MAE_test <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE test.csv", sep = ""), sep=',')
+MSE_train <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""), sep=',')
+MSE_test <- read.csv(file = paste(this.dir(), "/Résultats R script/MsE train.csv", sep = ""), sep = ',')
+Valeurs_Biais <- read.csv(file = paste(this.dir(), "/Résultats R script/Valeurs et Biais.csv", sep = ""), sep = ',')
 ```
 
+## Valeurs moyennes des effets
+
 ```{r, echo:false}
-val_moy <- colMeans(as.numeric(Valeurs_Biais[c('µ.Gamma1','µ.Gamma2','µ.Gamma3','sigma.Gamma1','sigma.Gamma2','sigma.Gamma3')]))
+val_moy <- colMeans(Valeurs_Biais[c('µ.Gamma1','µ.Gamma2','µ.Gamma3','sigma.Gamma1','sigma.Gamma2','sigma.Gamma3')])
 val_moy
+
 ```
+
+## Biais moyens
+
 ```{r}
-biais_moy <-colMeans(as.numeric(Valeurs_Biais[c('Biais.µ.Gamma1','Biais.µ.Gamma2','Biais.µ.Gamma3','Biais.sigma.Gamma1','Biais.sigma.Gamma2','Biais.sigma.Gamma3')]))
+biais_moy <-colMeans(Valeurs_Biais[c('Biais.µ.Gamma.1','Biais.µ.Gamma.2','Biais.µ.Gamma3','Biais.sigma.Gamma1','Biais.sigma.Gamma.2','Biais.sigma.Gamma3')])
 biais_moy
 ```
 
+## Performances moyennes
+
 ```{r, echo:false}
-perf_moy <- data.frame('MAE_train' = mean(as.numeric(MAE_train$MAE_train)), 
-                       'MSE_train' = mean(as.numeric(MSE_train$MSE_train)),
-                       'MAE_test' = mean(as.numeric(MAE_test$MAE_train)), 
-                       'MSE_test' = mean(as.numeric(MSE_test$X.MSE_train))
+perf_moy <- data.frame('MAE_train' = mean(MAE_train$MAE), 
+                       'MSE_train' = mean(MSE_train$MSE),
+                       'MAE_test' = mean(MAE_test$MAE), 
+                       'MSE_test' = mean(MSE_test$MSE)
                        )
 perf_moy
 ```
-
-```{r}
-
-```
-
