@@ -1,6 +1,6 @@
 ## Import des bilbiothèques
-
-
+  
+  
 library(rockchalk)
 library(dplyr)
 library(this.path)
@@ -92,7 +92,7 @@ write.csv2(x = Dtest, file = paste(this.dir(), "/Simulations/01_test.csv", sep="
 ## Génération des datasets d'entrainement
 
 
-num_simulations <- 3
+num_simulations <- 100
 res <- list()
 mse_train_oracle <- list()
 mse_test_oracle <- list()
@@ -105,23 +105,23 @@ for (k in 1:num_simulations) {
   Dtrain <- simul()
   write.csv2(x = Dtrain, file = paste(this.dir(), "/Simulations/simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)
   
-  oracle_mixed <- lmer(y_mixed_obs ~ x1_x5 + x2_x6 + (x1_x5 + x2_x6|individus),
-                       data = Dtrain)
-  sum_oracle <- summary(oracle_mixed)
+  oracle_mixed <- hlme(y_mixed_obs ~ x1_x5 + x2_x6,
+                       random=~ x1_x5 + x2_x6,
+                       data= Dtrain, subject='individus',
+                       nproc = 4)
   
-  beta_k <- sum_oracle$coefficients[,'Estimate']
-  sigma_k <- diag(sum_oracle$varcor$individus)
+  beta_k <- oracle_mixed$best[1:3]
+  sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
   biais_beta <- beta_k - µ_gamma
   biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
   res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
   
-  mse_train_oracle[k] <- mean(sum_oracle$residuals^2)
-  mae_train_oracle[k] <- mean(abs(sum_oracle$residuals))
+  mse_train_oracle[k] <- mean(oracle_mixed$pred[,'resid_ss']^2)
+  mae_train_oracle[k] <- mean(abs(oracle_mixed$pred[,'resid_ss']))
   
-  pred <-predict(oracle_mixed, newdata = Dtest, re.form=~(x1_x5 + x2_x6|individus))
-  
-  mse_test_oracle[k] <- mean((pred - Dtest$y_mixed)^2)
-  mae_test_oracle[k] <- mean(abs(pred-Dtest$y_mixed))
+  pred <-predictY(oracle_mixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus' )
+  mse_test_oracle[k] <- mean((pred$pred[,'pred_ss'] - Dtest$y_mixed)^2)
+  mae_test_oracle[k] <- mean(abs(pred$pred[,'pred_ss'] - Dtest$y_mixed))
   
   #naif_mixed <- lmer(y_mixed_obs ~ temps + temps^2 + (temps + temps^2|individus),
   #data = Dtrain)
@@ -152,6 +152,3 @@ write.csv(x = res, file = paste(this.dir(), "/Résultats R script/Valeurs et Bia
 write.csv(x = mae_train_oracle, file = paste(this.dir(), "/Résultats R script/MAE train.csv", sep = ""))
 write.csv(x = mae_test_oracle, file = paste(this.dir(), "/Résultats R script/MAE test.csv", sep = ""))
 write.csv(x = mse_test_oracle, file = paste(this.dir(), "/Résultats R script/MsE test.csv", sep = ""))
-
-
-
