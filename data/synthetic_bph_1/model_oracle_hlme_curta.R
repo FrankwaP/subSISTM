@@ -3,8 +3,6 @@
   
 library(rockchalk)
 library(dplyr)
-library(this.path)
-library(lme4)
 library(lcmm)
 
 
@@ -86,7 +84,7 @@ simul <- function(
 
 
 Dtest <- simul()
-write.csv2(x = Dtest, file = paste(this.dir(), "/Simulations/01_test.csv", sep=""), row.names = FALSE)
+write.csv2(x = Dtest, file = "01_test.csv", row.names = FALSE)
 
 
 ## Génération des datasets d'entrainement
@@ -103,13 +101,13 @@ Dtrain <- simul()
 
 for (k in 1:num_simulations) {
   Dtrain <- simul()
-  write.csv2(x = Dtrain, file = paste(this.dir(), "/Simulations/simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)
+  write.csv2(x = Dtrain, file = paste("simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)
   
   oracle_mixed <- hlme(y_mixed_obs ~ x1_x5 + x2_x6,
                        random=~ x1_x5 + x2_x6,
                        data= Dtrain, subject='individus',
                        nproc = 6)
-  save(oracle_mixed, file = paste(this.dir(), "/Models_oracles/oracle", as.character(k) ,".rda", sep = ""))
+  save(oracle_mixed, file = paste("oracle", as.character(k) ,".rda", sep = ""))
   
   beta_k <- oracle_mixed$best[1:3]
   sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
@@ -137,14 +135,14 @@ colnames(res) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
                    'Biais sigma Gamma1', 'Biais sigma Gamma 2', 'Biais sigma Gamma3')
 
 
-mse_train_oracle <- data.frame('MSE_train' = unlist(mse_train_oracle, use.names= FALSE))
-mae_train_oracle <- data.frame('MAE_train' = unlist(mae_train_oracle, use.names= FALSE))
-mse_test_oracle <- data.frame('MSE_train' = unlist(mse_test_oracle, use.names= FALSE))
-mae_test_oracle <- data.frame('MAE_train' = unlist(mae_test_oracle, use.names= FALSE))
+mse_train_oracle <- data.frame('MSE' = unlist(mse_train_oracle, use.names= FALSE))
+mae_train_oracle <- data.frame('MAE' = unlist(mae_train_oracle, use.names= FALSE))
+mse_test_oracle <- data.frame('MSE' = unlist(mse_test_oracle, use.names= FALSE))
+mae_test_oracle <- data.frame('MAE' = unlist(mae_test_oracle, use.names= FALSE))
 
-write.csv(x = res, file = paste(this.dir(), "/Résultats R script/Valeurs et Biais.csv", sep = ""))
-write.csv(x = mse_train_oracle, file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""))
-write.csv(x = mae_train_oracle, file = paste(this.dir(), "/Résultats R script/MAE train.csv", sep = ""))
-write.csv(x = mae_test_oracle, file = paste(this.dir(), "/Résultats R script/MAE test.csv", sep = ""))
-write.csv(x = mse_test_oracle, file = paste(this.dir(), "/Résultats R script/MsE test.csv", sep = ""))
 
+write.csv(x = mse_train_oracle, file = paste( "MSE train.csv", sep = ""))
+write.csv(x = res, file = paste( "Valeurs et Biais.csv", sep = ""))
+write.csv(x = mae_train_oracle, file = paste( "MAE train.csv", sep = ""))
+write.csv(x = mae_test_oracle, file = paste( "MAE test.csv", sep = ""))
+write.csv(x = mse_test_oracle, file = paste( "MsE test.csv", sep = ""))
