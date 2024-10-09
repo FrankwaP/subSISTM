@@ -92,7 +92,7 @@ write.csv2(x = Dtest, file = paste(this.dir(), "/Simulations/01_test.csv", sep="
 ## Génération des datasets d'entrainement
 
 
-num_simulations <- 100
+num_simulations <- 1
 res <- list()
 mse_train_oracle <- list()
 mse_test_oracle <- list()
@@ -109,6 +109,7 @@ for (k in 1:num_simulations) {
                        random=~ x1_x5 + x2_x6,
                        data= Dtrain, subject='individus',
                        nproc = 4)
+  save(oracle_mixed, file = paste(this.dir(), "/Models_oracles/oracle", as.character(k) ,".rda", sep = ""))
   
   beta_k <- oracle_mixed$best[1:3]
   sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
@@ -122,11 +123,6 @@ for (k in 1:num_simulations) {
   pred <-predictY(oracle_mixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus' )
   mse_test_oracle[k] <- mean((pred$pred[,'pred_ss'] - Dtest$y_mixed)^2)
   mae_test_oracle[k] <- mean(abs(pred$pred[,'pred_ss'] - Dtest$y_mixed))
-  
-  #naif_mixed <- lmer(y_mixed_obs ~ temps + temps^2 + (temps + temps^2|individus),
-  #data = Dtrain)
-  #sum_naif <- summary(naif_mixed)
-  #mse_train_naif[k] <- mean(sum_naif$residuals^2)
 }
 
 
