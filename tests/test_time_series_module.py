@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from tools.time_series_modules import TimeSerieShapeChanger
 
@@ -41,20 +42,12 @@ ARR = np.array(
 DF = DF.sort_values(by=[TIMESTEP_NAME])  # to fuck around
 
 
-# def test_easy_time_serie() -> None:
-
-#     tsdf = TimeSeriesDataFrame(DF, SERIE_NAME, TIMESTEP_NAME)
-
-#     arr_test = tsdf.get_3D_array(OTHER_NAMES)
-#     assert np.all(arr_test == ARR)
-
-#     iser, istep, ifeat = 2, 1, 0
-#     arr_test[iser, istep, ifeat] = 666
-#     tsdf.set_from_3D_array(OTHER_NAMES, arr_test)
-#     val_test = tsdf[(tsdf[SERIE_NAME] == iser) & (tsdf[TIMESTEP_NAME] == istep)][
-#         OTHER_NAMES[ifeat]
-#     ]
-#     assert val_test.shape == (1,) and val_test.values[0] == 666
+incorrect_dim_array3D = np.concatenate([ARR, ARR])
+n, t, p = ARR.shape
+n_, t_, p_ = incorrect_dim_array3D.shape
+assert n_ == n * 2
+assert t_ == t_
+assert p_ == p
 
 
 def test_time_serie_shape_changer() -> None:
@@ -75,3 +68,6 @@ def test_time_serie_shape_changer() -> None:
     df2D = shpchng.array3D_to_df2D(arr3D)
 
     assert df2D.equals(DF.sort_values([SERIE_NAME, TIMESTEP_NAME]))
+
+    with pytest.raises(UserWarning):
+        _ = shpchng.array3D_to_df2D(incorrect_dim_array3D)

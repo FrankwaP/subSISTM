@@ -1,8 +1,5 @@
 # %%
-
-
-from typing import Callable, Union, NamedTuple
-
+from typing import Optional, Callable, Any
 
 from sklearn.model_selection import train_test_split
 import numpy as np
@@ -22,7 +19,8 @@ def _get_and_check_series_and_timesteps(
 
     if len(df) != N_series * N_timesteps:
         raise UserWarning(
-            "This tool considers that all the series have the same timesteps (so the dataframe is Nseries x Ntimesteps)."
+            "This tool considers that all the series have the same timesteps"
+            " (so the dataframe is Nseries x Ntimesteps)."
         )
 
     print(
@@ -31,115 +29,71 @@ def _get_and_check_series_and_timesteps(
     return (series_unq, timesteps_unq)
 
 
-# class TimeSeriesDataFrame(pd.DataFrame):
+class TimeSeriesData:
 
-#     def __init__(
-#         self,
-#         dataframe: pd.DataFrame,
-#         serie_column_name: str,
-#         timestep_column_name: str,
-#     ):
-#         print("Checking the input…")
-#         assert isinstance(dataframe, pd.DataFrame)
+    def __init__(
+        self,
+        dataframe: pd.DataFrame,
+        serie_column_name: str,
+        timestep_column_name: str,
+    ):
+        print("Checking the input…")
+        assert isinstance(dataframe, pd.DataFrame)
 
-#         assert isinstance(serie_column_name, str)
-#         assert serie_column_name in dataframe.columns
+        assert isinstance(serie_column_name, str)
+        assert serie_column_name in dataframe.columns
 
-#         assert isinstance(timestep_column_name, str)
-#         assert timestep_column_name in dataframe.columns
+        assert isinstance(timestep_column_name, str)
+        assert timestep_column_name in dataframe.columns
 
-#         sort_columns = [serie_column_name, timestep_column_name]
-#         super().__init__(dataframe.sort_values(by=sort_columns))
+        sort_columns = [serie_column_name, timestep_column_name]
 
-#         self.series, self.timesteps = _get_and_check_series_and_timesteps(
-#             dataframe, serie_column_name, timestep_column_name
-#         )
+        self.series, self.timesteps = _get_and_check_series_and_timesteps(
+            dataframe, serie_column_name, timestep_column_name
+        )
 
-#         self.serie_column_name = serie_column_name
-#         self.timestep_column_name = timestep_column_name
+        self.serie_column_name = serie_column_name
+        self.timestep_column_name = timestep_column_name
+        self.others_column_names = [c for c in dataframe if c not in sort_columns]
+        self.dataframe = dataframe.sort_values(by=sort_columns)
 
-#     def __getitem__(self, key):
-#         return TimeSeriesDataFrame(
-#             super().__getitem__(key), self.serie_column_name, self.timestep_column_name
-#         )
+    def __getitem__(self, idx: Any) -> "TimeSeriesData":
+        return TimeSeriesData(
+            self.dataframe[idx], self.serie_column_name, self.timestep_column_name
+        )
 
-#     ######
-#     # trick to handle the fact that after initialization (or instantiation?) "dataframe.name" is equivalent to "dataframe['name']"
-#     # so we cannot create new object attributes using "self.attribute = something" and we need to work with "self.__dict__["attribute"]"
-#     # also for some reason inheriting from pd.Dataframe make setting a value pass by the property caller… so I've used a try/except
+    @property
+    def loc(self):
+        return self.dataframe.loc
 
-#     @property
-#     def serie_column_name(self) -> str:
-#         try:
-#             return self.__dict__["_serie_column_name"]
-#         except KeyError:
-#             return None
+    def _convert_2D_to_3D_array(
+        self, array_2D: np.ndarray, N_columns: int
+    ) -> np.ndarray:
+        return array_2D.reshape([self.N_series, self.N_timesteps, N_columns])
 
-#     @serie_column_name.setter
-#     def serie_column_name(self, val) -> None:
-#         self.__dict__["_serie_column_name"] = val
+    def _convert_3D_to_2D_array(
+        self, array_3D: np.ndarray, N_columns: int
+    ) -> np.ndarray:
+        return array_3D.reshape([self.N_series * self.N_timesteps, N_columns])
 
-#     @property
-#     def timestep_column_name(self) -> str:
-#         try:
-#             return self.__dict__["_timestep_column_name"]
-#         except KeyError:
-#             return None
+    def get_3D_array(self) -> np.ndarray:
+        return self._convert_2D_to_3D_array(
+            self.dataframe[self.others_column_names].to_numpy(),
+            len(self.others_column_names),
+        )
 
-#     @timestep_column_name.setter
-#     def timestep_column_name(self, val) -> None:
-#         self.__dict__["_timestep_column_name"] = val
+    def apply_to_columns(self, func: Callable) -> None:
+        self.dataframe.loc[:, self.others_column_names].values = func(
+            self.dataframe[self.others_column_names].values
+        )
 
-#     @property
-#     def series(self) -> np.ndarray:
-#         try:
-#             return self.__dict__["_series"]
-#         except KeyError:
-#             return None
+    # def set_from_2D_array(
+    #     self, arr: np.ndarray, column_names: Optional[list[str]] = None
+    # ) -> None:
+    #     self[column_names] = self._convert_3D_to_2D_array(arr, len(column_names))
 
-#     @series.setter
-#     def series(self, val) -> None:
-#         self.__dict__["_series"] = val
-
-#     @property
-#     def timesteps(self) -> np.ndarray:
-#         try:
-#             return self.__dict__["_timesteps"]
-#         except KeyError:
-#             return None
-
-#     @timesteps.setter
-#     def timesteps(self, val) -> None:
-#         self.__dict__["_timesteps"] = val
-
-#     @property
-#     def N_series(self) -> int:
-#         return len(self.series)
-
-#     @property
-#     def N_timesteps(self) -> int:
-#         return len(self.timesteps)
-
-#     # end trick
-#     ######
-
-#     def _convert_2D_to_3D_array(
-#         self, array_2D: np.ndarray, N_columns: int
-#     ) -> np.ndarray:
-#         return array_2D.reshape([self.N_series, self.N_timesteps, N_columns])
-
-#     def _convert_3D_to_2D_array(
-#         self, array_3D: np.ndarray, N_columns: int
-#     ) -> np.ndarray:
-#         return array_3D.reshape([self.N_series * self.N_timesteps, N_columns])
-
-#     def get_3D_array(self, column_names: list[str]) -> np.ndarray:
-#         return self._convert_2D_to_3D_array(
-#             self[column_names].to_numpy(), len(column_names)
-#         )
-
-#     def set_from_3D_array(self, column_names: list[str], arr: np.ndarray) -> None:
-#         self[column_names] = self._convert_3D_to_2D_array(arr, len(column_names))
+    # def set_from_3D_array(self, column_names: list[str], arr: np.ndarray) -> None:
+    #     self[column_names] = self._convert_3D_to_2D_array(arr, len(column_names))
 
 
 def train_test_split_on_series(
@@ -172,10 +126,13 @@ class TimeSerieShapeChanger:
     """
     Object that hopefully helps using Time Series with Scikit Learn pipelines.
 
-    instead of being initialized (during the __init__), the dimensions of the time series are calculated
-    each time we use 2D-to-3D conversions, and are used during 3D-to-2D conversions
-    that way it can be used for datasets of different size,
-    providing we always start with using a 2D-to-3D conversion on them
+    Instead of being initialized (during the __init__), the dimensions of the time
+    series are calculated each time we use the 2D-to-3D conversion.
+    Then the same dimensions are used for the following 3D-to-2D conversions.
+
+    That way it can be used for datasets of different size (like train and test dataset)
+    providing we always do a 2D-to-3D conversion first then immediately the 3D-to-2D
+    conversion on the same dataset.
     """
 
     def __init__(
@@ -216,7 +173,8 @@ class TimeSerieShapeChanger:
     def array3D_to_df2D(self, arr: np.ndarray) -> pd.DataFrame:
 
         user_warn = UserWarning(
-            "The 2D-to-3D conversion has been done on another type of data so we cannot do the 3D-to-2D."
+            "The 2D-to-3D conversion has been done on another type of data "
+            "so we cannot do the 3D-to-2D conversion."
         )
         try:
             shape_test = (
