@@ -7,6 +7,7 @@ library(lcmm)
 library(doParallel)
 library(foreach)
 
+set.seed(0)
 ## Définition des variables
 
 cl <- makeCluster(20)
@@ -20,18 +21,19 @@ colnames(dataframe) <- c("individus", "temps")
 k <- 7
 # Epsilon
 sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.002, 0.05, 0.005, 0.1)
+
 # X
 mu0 <- runif(k, -10, 10)
 sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
-
 mu1 <- runif(k, -1, 1) 
-sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 0.2, 0.5))
+sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 0.1, 0.5))
+truthX <- data.frame("µ0"=mu0, "µ1" = mu1, "sigma0"=diag(sig0), "sigma1"=diag(sig1))
+rownames(truthX) <- c('X1','X2','X3','X4','X5','X6','X7')
 
 # Y
 µ_gamma <- runif(3, -1, 1)
 sdgamma <- diag(c(0.5, 0.5, 0.05))
-truthX <- data.frame("µ0"=mu0, "µ1" = mu1, "sigma0"=diag(sig0), "sigma1"=diag(sig1))
-rownames(truthX) <- c('X1','X2','X3','X4','X5','X6','X7')
+truthY <- data.frame('µ' = µ_gamma, 'sigma²' = sdgamma, 'var_eps' = sigma_epsilon[8])
 
 ## Fonction simul()
 
@@ -114,9 +116,11 @@ boucle <- foreach(i=1:100, .combine=cbind) %dopar%
   
   beta_k <- oracle_mixed$best[1:3]
   sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
+  var_eps <- oracle_mixed$best['stderr']
+  biais_var_eps <- var_eps - 0.1
   biais_beta <- beta_k - µ_gamma
   biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
-  res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
+  res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma, var_eps, biais_var_eps)
   
   pred_train <- predictY(oracle_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
   mae_train_oracle[k] <- mean(abs(pred_train$pred[,'pred_ss'] - Dtrain$y_mixed))
@@ -133,10 +137,10 @@ boucle <- foreach(i=1:100, .combine=cbind) %dopar%
 
 
 res <- data.frame(matrix(unlist(res), nrow=length(res), byrow=TRUE))
-colnames(res) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
-                   'Biais µ Gamma 1', 'Biais µ Gamma 2', 'Biais µ Gamma3',
-                   'sigma Gamma1', 'sigma Gamma2', 'sigma Gamma3',
-                   'Biais sigma Gamma1', 'Biais sigma Gamma 2', 'Biais sigma Gamma3')
+colnames(res) <- c('µ Gamma 1','µ Gamma 2', 'µ Gamma 3',
+                   'Biais µ Gamma 1', 'Biais µ Gamma 2', 'Biais µ Gamma 3',
+                   'sigma Gamma 1', 'sigma Gamma2', 'sigma Gamma 3',
+                   'Biais sigma Gamma 1', 'Biais sigma Gamma 2', 'Biais sigma Gamma 3', 'sigma eps', 'Biais sigma eps')
 
 
 mse_train_oracle <- data.frame('MSE' = unlist(mse_train_oracle, use.names= FALSE))
@@ -144,7 +148,8 @@ mae_train_oracle <- data.frame('MAE' = unlist(mae_train_oracle, use.names= FALSE
 mse_test_oracle <- data.frame('MSE' = unlist(mse_test_oracle, use.names= FALSE))
 mae_test_oracle <- data.frame('MAE' = unlist(mae_test_oracle, use.names= FALSE))
 
-
+write.csv(x = truthY, file = paste( "valeurs Y", sep = ""))
+write.csv(x = truthX, file = paste( "valeurs X", sep = ""))
 write.csv(x = mse_train_oracle, file = paste( "MSE train.csv", sep = ""))
 write.csv(x = res, file = paste( "Valeurs et Biais.csv", sep = ""))
 write.csv(x = mae_train_oracle, file = paste( "MAE train.csv", sep = ""))
