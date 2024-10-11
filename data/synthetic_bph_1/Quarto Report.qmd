@@ -10,9 +10,16 @@ editor: visual
 library(rockchalk)
 library(dplyr)
 library(this.path)
-library(lme4)
-library(lcmm)
+library(lcmm) 
 ```
+
+## Simulation
+
+On simule 100 Dtrain de 25500 observations (500 individus \* 51 temps), 1 Dtest avec les mêmes
+
+Modélisation : hlme( y_mixed_obs\~ x1_x5 + x2_x6, random=\~ x1_x5 + x2_x6, data = Dtrain, subject = 'individus', nproc = 15 )
+
+Prédiction: predictY( oracle_mixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus' )
 
 ## Import des résultats
 
@@ -20,7 +27,7 @@ library(lcmm)
 MAE_train <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE train.csv", sep = ""), sep=',')
 MAE_test <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE test.csv", sep = ""), sep=',')
 MSE_train <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""), sep=',')
-MSE_test <- read.csv(file = paste(this.dir(), "/Résultats R script/MsE train.csv", sep = ""), sep = ',')
+MSE_test <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE test.csv", sep = ""), sep = ',')
 Valeurs_Biais <- read.csv(file = paste(this.dir(), "/Résultats R script/Valeurs et Biais.csv", sep = ""), sep = ',')
 ```
 
@@ -42,10 +49,14 @@ biais_moy
 ## Performances moyennes
 
 ```{r, echo:false}
-perf_moy <- data.frame('MAE_train' = mean(MAE_train$MAE), 
+perf_moy <- data.frame('MAE_train' = mean(MAE_train$MAE),
+                       'MAE_test' = mean(MAE_test$MAE),
                        'MSE_train' = mean(MSE_train$MSE),
-                       'MAE_test' = mean(MAE_test$MAE), 
-                       'MSE_test' = mean(MSE_test$MSE)
-                       )
+                       'MSE_test' = mean(MSE_test$MSE))
 perf_moy
+```
+
+```{r}
+write.csv(x = val_moy, file = paste(this.dir(), "/Résultats R script/valeurs_moyennes",sep=""))
+write.csv(x = perf_moy, file = paste(this.dir(), "/Résultats R script/Performances_moyennes",sep=""))
 ```

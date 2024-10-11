@@ -150,8 +150,8 @@ mae_train_oracle <- data.frame('MAE_train' = unlist(mae_train_oracle, use.names=
 mse_test_oracle <- data.frame('MSE_train' = unlist(mse_test_oracle, use.names= FALSE))
 mae_test_oracle <- data.frame('MAE_train' = unlist(mae_test_oracle, use.names= FALSE))
 
-write.csv(x = truthY, file = paste( "valeurs Y", sep = ""))
-write.csv(x = truthX, file = paste( "valeurs X", sep = ""))
+write.csv(x = truthY, file = paste(this.dir(), "/Résultats R script/valeurs Y.csv", sep = ""))
+write.csv(x = truthX, file = paste(this.dir(), "/Résultats R script/valeurs X.csv", sep = ""))
 write.csv(x = res, file = paste(this.dir(), "/Résultats R script/Valeurs et Biais.csv", sep = ""))
 write.csv(x = mse_train_oracle, file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""))
 write.csv(x = mae_train_oracle, file = paste(this.dir(), "/Résultats R script/MAE train.csv", sep = ""))
