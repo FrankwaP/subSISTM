@@ -4,32 +4,32 @@
 library(rockchalk)
 library(dplyr)
 library(this.path)
-library(lme4)
+library(ggplot2)
 library(lcmm)
 
 
 ## Définition des variables
 
-
 ind <- 1:500
-time <- 0:50
+time <- 0:25
 l <- list(ind, time)
 dataframe <- rev(expand.grid(rev(l)))
 colnames(dataframe) <- c("individus", "temps")
-k <- 8
+k <- 7
 # Epsilon
 sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.002, 0.05, 0.005, 0.1)
 # X
-mu0 <- runif(k, -1, 1)
-sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
+mu0 <- runif(k, -10, 10)
+sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
 
-mu1 <- runif(k, -1, 1)
-sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 1, 0.5, 0.5))
+mu1 <- runif(k, -1, 1) 
+sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 0.2, 0.5))
 
 # Y
 µ_gamma <- runif(3, -1, 1)
 sdgamma <- diag(c(0.5, 0.5, 0.05))
-µ_gamma
+truthX <- data.frame("µ0"=mu0, "µ1" = mu1, "sigma0"=diag(sig0), "sigma1"=diag(sig1))
+rownames(truthX) <- c('X1','X2','X3','X4','X5','X6','X7')
 
 
 ## Fonction simul()
@@ -61,19 +61,19 @@ simul <- function(
   df <- df %>%
     mutate(x8 = ifelse(df$individus %% 2 == 0, 1, 0))
   
-  df$x1_x5 <- df$x1 * df$x5
-  df$x2_x6 <- df$x2 * df$x6
+  df$x2_x5 <- df$x2 * df$x5
+  df$x4_x7 <- df$x4 * df$x7
   
   df$y_mixed <- g_mixed[df$individus, 1] +
-    g_mixed[df$individus, 2] * df$x1 * df$x5 +
-    g_mixed[df$individus, 3] * df$x2 * df$x6
+    g_mixed[df$individus, 2] * df$x2 * df$x5 +
+    g_mixed[df$individus, 3] * df$x4 * df$x7
   
   df$y_mixed_obs <- df$y_mixed + rnorm(length(df$y_mixed), 0, sigeps[8])
   
   
   df$y_fixed <- g_fixed[df$individus, 1] + 
-    g_fixed[df$individus, 2] * df$x1 * df$x5 + 
-    g_fixed[df$individus, 3] * df$x2 * df$x6
+    g_fixed[df$individus, 2] * df$x2 * df$x5 + 
+    g_fixed[df$individus, 3] * df$x4 * df$x7
   
   
   df$y_fixed_obs <- df$y_fixed + rnorm(length(df$y_fixed), 0, sigeps[8])
@@ -92,21 +92,20 @@ write.csv2(x = Dtest, file = paste(this.dir(), "/Simulations/01_test.csv", sep="
 ## Génération des datasets d'entrainement
 
 
-num_simulations <- 1
+num_simulations <- 2
 res <- list()
 mse_train_oracle <- list()
 mse_test_oracle <- list()
 mae_train_oracle <- list()
 mae_test_oracle <- list()
-Dtrain <- simul()
 
 
 for (k in 1:num_simulations) {
   Dtrain <- simul()
   write.csv2(x = Dtrain, file = paste(this.dir(), "/Simulations/simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)
   
-  oracle_mixed <- hlme(y_mixed_obs ~ x1_x5 + x2_x6,
-                       random=~ x1_x5 + x2_x6,
+  oracle_mixed <- hlme(y_mixed_obs ~ x2_x5 + x4_x7,
+                       random=~ x2_x5 + x4_x7,
                        data= Dtrain, subject='individus',
                        nproc = 6)
   save(oracle_mixed, file = paste(this.dir(), "/Models_oracles/oracle", as.character(k) ,".rda", sep = ""))
@@ -117,8 +116,9 @@ for (k in 1:num_simulations) {
   biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
   res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
   
-  mse_train_oracle[k] <- mean(oracle_mixed$pred[,'resid_ss']^2)
-  mae_train_oracle[k] <- mean(abs(oracle_mixed$pred[,'resid_ss']))
+  pred_train <- predictY(oracle_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_train_oracle[k] <- mean(abs(pred_train$pred[,'pred_ss'] - Dtrain$y_mixed))
+  mse_train_oracle[k] <- mean((pred_train$pred[,'pred_ss'] - Dtrain$y_mixed)^2)
   
   pred <-predictY(oracle_mixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus' )
   mse_test_oracle[k] <- mean((pred$pred[,'pred_ss'] - Dtest$y_mixed)^2)
@@ -126,9 +126,13 @@ for (k in 1:num_simulations) {
 }
 
 
+## Spaguetti plot
+ggplot(Dtest, aes(y=x6, x=temps, colour=individus))+
+  geom_point()+
+  geom_line(aes(group=individus))+
+  scale_x_continuous(breaks=0:9) 
+
 ## Ecrire les résultats
-
-
 
 res <- data.frame(matrix(unlist(res), nrow=length(res), byrow=TRUE))
 colnames(res) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',

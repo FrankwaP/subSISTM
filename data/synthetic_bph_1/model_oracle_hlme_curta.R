@@ -4,37 +4,40 @@
 library(rockchalk)
 library(dplyr)
 library(lcmm)
-
+library(doParallel)
+library(foreach)
 
 ## Définition des variables
 
+cl <- makeCluster(20)
+registerDoParallel(cl)
 
 ind <- 1:500
-time <- 0:50
+time <- 0:25
 l <- list(ind, time)
 dataframe <- rev(expand.grid(rev(l)))
 colnames(dataframe) <- c("individus", "temps")
-k <- 8
+k <- 7
 # Epsilon
 sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.002, 0.05, 0.005, 0.1)
 # X
-mu0 <- runif(k, -1, 1)
-sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
+mu0 <- runif(k, -10, 10)
+sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
 
-mu1 <- runif(k, -1, 1)
-sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 1, 0.5, 0.5))
+mu1 <- runif(k, -1, 1) 
+sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 0.2, 0.5))
 
 # Y
 µ_gamma <- runif(3, -1, 1)
 sdgamma <- diag(c(0.5, 0.5, 0.05))
-µ_gamma
-
+truthX <- data.frame("µ0"=mu0, "µ1" = mu1, "sigma0"=diag(sig0), "sigma1"=diag(sig1))
+rownames(truthX) <- c('X1','X2','X3','X4','X5','X6','X7')
 
 ## Fonction simul()
 
 
 simul <- function(
-    individus = ind, k = 5, df = dataframe, µ0 = mu0, µ1 = mu1, sigma0 = sig0,
+    individus = ind, df = dataframe, µ0 = mu0, µ1 = mu1, sigma0 = sig0,
     sigma1 = sig1, µg = µ_gamma, sigmag = sdgamma, sigeps = sigma_epsilon) {
   
   alpha0 <- mvrnorm(length(individus), µ0, sigma0)
@@ -59,19 +62,19 @@ simul <- function(
   df <- df %>%
     mutate(x8 = ifelse(df$individus %% 2 == 0, 1, 0))
   
-  df$x1_x5 <- df$x1 * df$x5
-  df$x2_x6 <- df$x2 * df$x6
+  df$x2_x5 <- df$x2 * df$x5
+  df$x4_x7 <- df$x4 * df$x7
   
   df$y_mixed <- g_mixed[df$individus, 1] +
-    g_mixed[df$individus, 2] * df$x1 * df$x5 +
-    g_mixed[df$individus, 3] * df$x2 * df$x6
+    g_mixed[df$individus, 2] * df$x2 * df$x5 +
+    g_mixed[df$individus, 3] * df$x4 * df$x7
   
   df$y_mixed_obs <- df$y_mixed + rnorm(length(df$y_mixed), 0, sigeps[8])
   
   
   df$y_fixed <- g_fixed[df$individus, 1] + 
-    g_fixed[df$individus, 2] * df$x1 * df$x5 + 
-    g_fixed[df$individus, 3] * df$x2 * df$x6
+    g_fixed[df$individus, 2] * df$x2 * df$x5 + 
+    g_fixed[df$individus, 3] * df$x4 * df$x7
   
   
   df$y_fixed_obs <- df$y_fixed + rnorm(length(df$y_fixed), 0, sigeps[8])
@@ -96,15 +99,15 @@ mse_train_oracle <- list()
 mse_test_oracle <- list()
 mae_train_oracle <- list()
 mae_test_oracle <- list()
-Dtrain <- simul()
 
 
-for (k in 1:num_simulations) {
+boucle <- foreach(i=1:100, .combine=cbind) %dopar%
+{
   Dtrain <- simul()
   write.csv2(x = Dtrain, file = paste("simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)
   
-  oracle_mixed <- hlme(y_mixed_obs ~ x1_x5 + x2_x6,
-                       random=~ x1_x5 + x2_x6,
+  oracle_mixed <- hlme(y_mixed_obs ~ x2_x5 + x4_x7,
+                       random=~ x2_x5 + x4_x7,
                        data= Dtrain, subject='individus',
                        nproc = 15)
   save(oracle_mixed, file = paste("oracle", as.character(k) ,".rda", sep = ""))
@@ -115,8 +118,9 @@ for (k in 1:num_simulations) {
   biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
   res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
   
-  mse_train_oracle[k] <- mean(oracle_mixed$pred[,'resid_ss']^2)
-  mae_train_oracle[k] <- mean(abs(oracle_mixed$pred[,'resid_ss']))
+  pred_train <- predictY(oracle_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_train_oracle[k] <- mean(abs(pred_train$pred[,'pred_ss'] - Dtrain$y_mixed))
+  mse_train_oracle[k] <- mean((pred_train$pred[,'pred_ss'] - Dtrain$y_mixed)^2)
   
   pred <-predictY(oracle_mixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus' )
   mse_test_oracle[k] <- mean((pred$pred[,'pred_ss'] - Dtest$y_mixed)^2)
@@ -145,4 +149,7 @@ write.csv(x = mse_train_oracle, file = paste( "MSE train.csv", sep = ""))
 write.csv(x = res, file = paste( "Valeurs et Biais.csv", sep = ""))
 write.csv(x = mae_train_oracle, file = paste( "MAE train.csv", sep = ""))
 write.csv(x = mae_test_oracle, file = paste( "MAE test.csv", sep = ""))
-write.csv(x = mse_test_oracle, file = paste( "MsE test.csv", sep = ""))
+write.csv(x = mse_test_oracle, file = paste( "MSE test.csv", sep = ""))
+
+stopCluster(cl)
+q("no")
