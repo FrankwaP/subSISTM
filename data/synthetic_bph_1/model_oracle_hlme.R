@@ -7,6 +7,7 @@ library(this.path)
 library(ggplot2)
 library(lcmm)
 
+set.seed(0)
 
 ## Définition des variables
 
@@ -18,18 +19,20 @@ colnames(dataframe) <- c("individus", "temps")
 k <- 7
 # Epsilon
 sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.002, 0.05, 0.005, 0.1)
+
 # X
 mu0 <- runif(k, -10, 10)
 sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
-
 mu1 <- runif(k, -1, 1) 
-sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 0.2, 0.5))
+sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 0.1, 0.5))
+truthX <- data.frame("µ0"=mu0, "µ1" = mu1, "sigma0"=diag(sig0), "sigma1"=diag(sig1))
+rownames(truthX) <- c('X1','X2','X3','X4','X5','X6','X7')
 
 # Y
 µ_gamma <- runif(3, -1, 1)
 sdgamma <- diag(c(0.5, 0.5, 0.05))
-truthX <- data.frame("µ0"=mu0, "µ1" = mu1, "sigma0"=diag(sig0), "sigma1"=diag(sig1))
-rownames(truthX) <- c('X1','X2','X3','X4','X5','X6','X7')
+truthY <- data.frame('µ' = µ_gamma, 'sigma²' = diag(sdgamma), 'var_eps' = sigma_epsilon[8])
+rownames(truthY) <- c('intercept', 'beta1', 'beta2')
 
 
 ## Fonction simul()
@@ -112,6 +115,7 @@ for (k in 1:num_simulations) {
   
   beta_k <- oracle_mixed$best[1:3]
   sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
+  
   biais_beta <- beta_k - µ_gamma
   biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
   res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
@@ -140,7 +144,8 @@ colnames(res) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
                    'sigma Gamma1', 'sigma Gamma2', 'sigma Gamma3',
                    'Biais sigma Gamma1', 'Biais sigma Gamma 2', 'Biais sigma Gamma3')
 
-
+write.csv(x = truthY, file = paste( "valeurs Y", sep = ""))
+write.csv(x = truthX, file = paste( "valeurs X", sep = ""))
 mse_train_oracle <- data.frame('MSE_train' = unlist(mse_train_oracle, use.names= FALSE))
 mae_train_oracle <- data.frame('MAE_train' = unlist(mae_train_oracle, use.names= FALSE))
 mse_test_oracle <- data.frame('MSE_train' = unlist(mse_test_oracle, use.names= FALSE))
