@@ -8,6 +8,8 @@ __pycache__/
 .RData
 .Rhistory
 
+#Fichiers à générer sois même
+*.csv
 
 # C extensions
 *.so
