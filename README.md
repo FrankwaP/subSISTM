@@ -14,3 +14,6 @@ or go to the Github page (which renders/displays them) to present the current st
 
 Jupyter are suggested as they work for **Ju**lia/**Pyt**hon/**R**.
 
+
+**NOTE**: all "*_local" folders and "*_local.*" files will be considered as… local, and will be ignored by git! (see .gitignore)
+
