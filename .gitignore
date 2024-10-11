@@ -12,6 +12,7 @@ __pycache__/
 *.csv
 *.rda
 *_local
+*_local.*
 
 # C extensions
 *.so
