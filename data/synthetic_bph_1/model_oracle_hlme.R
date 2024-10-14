@@ -84,7 +84,6 @@ simul <- function(
   return(df)
 }
 
-
 ## Génération des données de test
 
 
@@ -96,39 +95,62 @@ write.csv2(x = Dtest, file = paste(this.dir(), "/Simulations/01_test.csv", sep="
 
 
 num_simulations <- 2
-res <- list()
-mse_train_oracle <- list()
-mse_test_oracle <- list()
-mae_train_oracle <- list()
-mae_test_oracle <- list()
+res_mixed <- list()
+mse_train_mixed <- list()
+mse_test_mixed <- list()
+mae_train_mixed <- list()
+mae_test_mixed <- list()
+res_fixed <- list()
+mse_train_fixed <- list()
+mse_test_fixed <- list()
+mae_train_fixed <- list()
+mae_test_fixed <- list()
 
 
 for (k in 1:num_simulations) {
   Dtrain <- simul()
   write.csv2(x = Dtrain, file = paste(this.dir(), "/Simulations/simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)
   
+  #Modèle oracle sur les Y à effet mixed
   oracle_mixed <- hlme(y_mixed_obs ~ x2_x5 + x4_x7,
                        random=~ x2_x5 + x4_x7,
                        data= Dtrain, subject='individus',
                        nproc = 6)
-  save(oracle_mixed, file = paste(this.dir(), "/Models_oracles/oracle", as.character(k) ,".rda", sep = ""))
+  save(oracle_mixed, file = paste(this.dir(), "/Models_oracles/oracle_mix", as.character(k) ,".rda", sep = ""))
   
   beta_k <- oracle_mixed$best[1:3]
   sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
   
   biais_beta <- beta_k - µ_gamma
   biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
-  res[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
+  res_mixed[[k]] <- c(beta_k, biais_beta, sigma_k, biais_sigma)
   
-  pred_train <- predictY(oracle_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
-  mae_train_oracle[k] <- mean(abs(pred_train$pred[,'pred_ss'] - Dtrain$y_mixed))
-  mse_train_oracle[k] <- mean((pred_train$pred[,'pred_ss'] - Dtrain$y_mixed)^2)
+  pred_train_mixed <- predictY(oracle_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_train_mixed[k] <- mean(abs(pred_train_mixed$pred[,'pred_ss'] - Dtrain$y_mixed))
+  mse_train_mixed[k] <- mean((pred_train_mixed$pred[,'pred_ss'] - Dtrain$y_mixed)^2)
   
-  pred <-predictY(oracle_mixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus' )
-  mse_test_oracle[k] <- mean((pred$pred[,'pred_ss'] - Dtest$y_mixed)^2)
-  mae_test_oracle[k] <- mean(abs(pred$pred[,'pred_ss'] - Dtest$y_mixed))
+  pred_test_mixed <-predictY(oracle_mixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus' )
+  mse_test_mixed[k] <- mean((pred_test_mixed$pred[,'pred_ss'] - Dtest$y_mixed)^2)
+  mae_test_mixed[k] <- mean(abs(pred_test_mixed$pred[,'pred_ss'] - Dtest$y_mixed))
+  
+  #Modèle oracle sur les Y à effet fixes
+  oracle_fixed <- lm(y_fixed_obs ~ x2_x5 + x4_x7, data=Dtrain)
+  sum_fix <- summary(oracle_fixed)
+  save(oracle_fixed, file = paste(this.dir(), "/Models_oracles/oracle_fix", as.character(k) ,".rda", sep = ""))
+  
+  beta_k <- sum_fix$coefficients[,'Estimate']
+  
+  biais_beta <- beta_k - µ_gamma
+  res_fixed[[k]] <- c(beta_k, biais_beta)
+  
+  pred_train_fixed <- predict(oracle_fixed, newdata = Dtrain)
+  mae_train_fixed[k] <- mean(abs(pred_train_fixed - Dtrain$y_fixed))
+  mse_train_fixed[k] <- mean((pred_train_fixed - Dtrain$y_fixed)^2)
+  
+  pred_test_fixed <-predict(oracle_fixed, newdata = Dtest)
+  mse_test_fixed[k] <- mean((pred_test_fixed - Dtest$y_fixed)^2)
+  mae_test_fixed[k] <- mean(abs(pred_test_fixed - Dtest$y_fixed))
 }
-
 
 ## Spaguetti plot
 ggplot(Dtest, aes(y=x6, x=temps, colour=individus))+
@@ -138,23 +160,34 @@ ggplot(Dtest, aes(y=x6, x=temps, colour=individus))+
 
 ## Ecrire les résultats
 
-res <- data.frame(matrix(unlist(res), nrow=length(res), byrow=TRUE))
-colnames(res) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
+res_mixed <- data.frame(matrix(unlist(res_mixed), nrow=length(res_mixed), byrow=TRUE))
+colnames(res_mixed) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
                    'Biais µ Gamma 1', 'Biais µ Gamma 2', 'Biais µ Gamma3',
                    'sigma Gamma1', 'sigma Gamma2', 'sigma Gamma3',
                    'Biais sigma Gamma1', 'Biais sigma Gamma 2', 'Biais sigma Gamma3')
+res_fixed <- data.frame(matrix(unlist(res_fixed), nrow=length(res_fixed), byrow=TRUE))
+colnames(res_fixed) <- c('µ Gamma1','µ Gamma2', 'µ Gamma3',
+                         'Biais µ Gamma 1', 'Biais µ Gamma 2', 'Biais µ Gamma3')
 
 
-mse_train_oracle <- data.frame('MSE_train' = unlist(mse_train_oracle, use.names= FALSE))
-mae_train_oracle <- data.frame('MAE_train' = unlist(mae_train_oracle, use.names= FALSE))
-mse_test_oracle <- data.frame('MSE_train' = unlist(mse_test_oracle, use.names= FALSE))
-mae_test_oracle <- data.frame('MAE_train' = unlist(mae_test_oracle, use.names= FALSE))
+mse_train_mixed <- data.frame('MSE_train' = unlist(mse_train_mixed, use.names= FALSE))
+mae_train_mixed <- data.frame('MAE_train' = unlist(mae_train_mixed, use.names= FALSE))
+mse_test_mixed <- data.frame('MSE_train' = unlist(mse_test_mixed, use.names= FALSE))
+mae_test_mixed <- data.frame('MAE_train' = unlist(mae_test_mixed, use.names= FALSE))
+mse_train_fixed <- data.frame('MSE_train' = unlist(mse_train_fixed, use.names= FALSE))
+mae_train_fixed <- data.frame('MAE_train' = unlist(mae_train_fixed, use.names= FALSE))
+mse_test_fixed <- data.frame('MSE_train' = unlist(mse_test_fixed, use.names= FALSE))
+mae_test_fixed <- data.frame('MAE_train' = unlist(mae_test_fixed, use.names= FALSE))
 
 write.csv(x = truthY, file = paste(this.dir(), "/Résultats R script/valeurs Y.csv", sep = ""))
 write.csv(x = truthX, file = paste(this.dir(), "/Résultats R script/valeurs X.csv", sep = ""))
-write.csv(x = res, file = paste(this.dir(), "/Résultats R script/Valeurs et Biais.csv", sep = ""))
-write.csv(x = mse_train_oracle, file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""))
-write.csv(x = mae_train_oracle, file = paste(this.dir(), "/Résultats R script/MAE train.csv", sep = ""))
-write.csv(x = mae_test_oracle, file = paste(this.dir(), "/Résultats R script/MAE test.csv", sep = ""))
-write.csv(x = mse_test_oracle, file = paste(this.dir(), "/Résultats R script/MsE test.csv", sep = ""))
-
+write.csv(x = res_mixed, file = paste(this.dir(), "/Résultats R script/Valeurs et Biais mixed.csv", sep = ""))
+write.csv(x = mse_train_mixed, file = paste(this.dir(), "/Résultats R script/MSE train mixed.csv", sep = ""))
+write.csv(x = mae_train_mixed, file = paste(this.dir(), "/Résultats R script/MAE train mixed.csv", sep = ""))
+write.csv(x = mae_test_mixed, file = paste(this.dir(), "/Résultats R script/MAE test mixed.csv", sep = ""))
+write.csv(x = mse_test_mixed, file = paste(this.dir(), "/Résultats R script/MsE test mixed.csv", sep = ""))
+write.csv(x = res_fixed, file = paste(this.dir(), "/Résultats R script/Valeurs et Biais fixed.csv", sep = ""))
+write.csv(x = mse_train_fixed, file = paste(this.dir(), "/Résultats R script/MSE train fixed.csv", sep = ""))
+write.csv(x = mae_train_fixed, file = paste(this.dir(), "/Résultats R script/MAE train fixed.csv", sep = ""))
+write.csv(x = mae_test_fixed, file = paste(this.dir(), "/Résultats R script/MAE test fixed.csv", sep = ""))
+write.csv(x = mse_test_fixed, file = paste(this.dir(), "/Résultats R script/MsE test fixed.csv", sep = ""))
