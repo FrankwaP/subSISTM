@@ -10,7 +10,7 @@ library(foreach)
 set.seed(0)
 ## Définition des variables
 
-cl <- makeCluster(20)
+cl <- makeCluster(10)
 registerDoParallel(cl)
 
 ind <- 1:500
@@ -103,7 +103,9 @@ mae_train_oracle <- list()
 mae_test_oracle <- list()
 
 
-boucle <- foreach(i=1:100, .combine=cbind) %dopar%
+boucle <- foreach(i=1:100, 
+                  .combine=cbind, 
+                  .packages=c("rockchalk", "dplyr", "lcmm", "doParallel", "foreach")) %dopar%
 {
   Dtrain <- simul()
   write.csv2(x = Dtrain, file = paste("simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)

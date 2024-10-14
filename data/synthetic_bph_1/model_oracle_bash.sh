@@ -7,7 +7,7 @@
 #SBATCH -t 10:00:00
 # nombre de coeurs n´ecessaires
 #SBATCH --nodes=1
-#SBATCH --ntasks=20
+#SBATCH --ntasks=10
 # se placer dans le r´epertoire de soumission
 #SBATCH --chdir=.
 # fin des directives
