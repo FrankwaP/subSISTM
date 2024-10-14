@@ -24,39 +24,53 @@ Prédiction: predictY( oracle_mixed, newdata = Dtest, var.time = 'temps', marg =
 ## Import des résultats
 
 ```{r, echo: false}
-MAE_train <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE train.csv", sep = ""), sep=',')
-MAE_test <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE test.csv", sep = ""), sep=',')
-MSE_train <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""), sep=',')
-MSE_test <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE test.csv", sep = ""), sep = ',')
-Valeurs_Biais <- read.csv(file = paste(this.dir(), "/Résultats R script/Valeurs et Biais.csv", sep = ""), sep = ',')
+MAE_train_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE train fixed.csv", sep = ""), sep=',')
+MAE_test_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE test fixed.csv", sep = ""), sep=',')
+MSE_train_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE train fixed.csv", sep = ""), sep=',')
+MSE_test_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE test fixed.csv", sep = ""), sep = ',')
+Valeurs_Biais_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/Valeurs et Biais fixed.csv", sep = ""), sep = ',')
+MAE_train_mixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE train mixed.csv", sep = ""), sep=',')
+MAE_test_mixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE test mixed.csv", sep = ""), sep=',')
+MSE_train_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""), sep=',')
+MSE_test_mixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE test mixed.csv", sep = ""), sep = ',')
+Valeurs_Biais_mixed <- read.csv(file = paste(this.dir(), "/Résultats R script/Valeurs et Biais mixed.csv", sep = ""), sep = ',')
 ```
 
 ## Valeurs moyennes des effets
 
 ```{r, echo:false}
-val_moy <- colMeans(Valeurs_Biais[c('µ.Gamma1','µ.Gamma2','µ.Gamma3','sigma.Gamma1','sigma.Gamma2','sigma.Gamma3')])
-val_moy
+val_moy_mixed <- colMeans(Valeurs_Biais_mixed[c('µ.Gamma1','µ.Gamma2','µ.Gamma3','sigma.Gamma1','sigma.Gamma2','sigma.Gamma3')])
+val_moy_mixed
 
 ```
 
 ## Biais moyens
 
 ```{r}
-biais_moy <-colMeans(Valeurs_Biais[c('Biais.µ.Gamma.1','Biais.µ.Gamma.2','Biais.µ.Gamma3','Biais.sigma.Gamma1','Biais.sigma.Gamma.2','Biais.sigma.Gamma3')])
-biais_moy
+biais_moy_mixed <-colMeans(Valeurs_Biais_mixed[c('Biais.µ.Gamma.1','Biais.µ.Gamma.2','Biais.µ.Gamma3','Biais.sigma.Gamma1','Biais.sigma.Gamma.2','Biais.sigma.Gamma3')])
+biais_moy_fixed <-colMeans(Valeurs_Biais_fixed[c('Biais.µ.Gamma.1','Biais.µ.Gamma.2','Biais.µ.Gamma3','Biais.sigma.Gamma1','Biais.sigma.Gamma.2','Biais.sigma.Gamma3')])
+biais_moy_mixed
+biais_moy_fixed
 ```
 
 ## Performances moyennes
 
 ```{r, echo:false}
-perf_moy <- data.frame('MAE_train' = mean(MAE_train$MAE),
-                       'MAE_test' = mean(MAE_test$MAE),
-                       'MSE_train' = mean(MSE_train$MSE),
-                       'MSE_test' = mean(MSE_test$MSE))
-perf_moy
+perf_moy_mixed <- data.frame('MAE_train' = mean(MAE_train_mixed$MAE),
+                       'MAE_test' = mean(MAE_test_mixed$MAE),
+                       'MSE_train' = mean(MSE_train_mixed$MSE),
+                       'MSE_test' = mean(MSE_test_mixed$MSE))
+perf_moy_fixed <- data.frame('MAE_train' = mean(MAE_train_fixed$MAE),
+                       'MAE_test' = mean(MAE_test_fixed$MAE),
+                       'MSE_train' = mean(MSE_train_fixed$MSE),
+                       'MSE_test' = mean(MSE_test_fixed$MSE))
+perf_moy_mixed
+perf_moy_fixed
 ```
 
 ```{r}
-write.csv(x = val_moy, file = paste(this.dir(), "/Résultats R script/valeurs_moyennes",sep=""))
-write.csv(x = perf_moy, file = paste(this.dir(), "/Résultats R script/Performances_moyennes",sep=""))
+write.csv(x = val_moy_mixed, file = paste(this.dir(), "/Résultats R script/valeurs_moyennes_mixed.csv",sep=""))
+write.csv(x = perf_moy_mixed, file = paste(this.dir(), "/Résultats R script/Performances_moyennes_mixed.csv",sep=""))
+write.csv(x = val_moy_fixed, file = paste(this.dir(), "/Résultats R script/valeurs_moyennes_fixed.csv",sep=""))
+write.csv(x = perf_moy_fixed, file = paste(this.dir(), "/Résultats R script/Performances_moyennes_fixed.csv",sep=""))
 ```
