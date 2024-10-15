@@ -125,7 +125,7 @@ boucle <- foreach(i=1:100,
   #Modèle oracle sur les Y à effet fixes
   oracle_fixed <- lm(y_fixed_obs ~ x2_x5 + x4_x7, data=Dtrain)
   sum_fix <- summary(oracle_fixed)
-  save(oracle_fixed, file = paste("oracle_fix", as.character(k) ,".rda", sep = ""))
+  save(oracle_fixed, file = paste("oracle_fix", as.character(i) ,".rda", sep = ""))
   
   beta_k <- sum_fix$coefficients[,'Estimate']
   
