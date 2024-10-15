@@ -94,29 +94,18 @@ write.csv2(x = Dtest, file = "01_test.csv", row.names = FALSE)
 
 ## Génération des datasets d'entrainement
 
-res_mixed <- list()
-mse_train_mixed <- list()
-mse_test_mixed <- list()
-mae_train_mixed <- list()
-mae_test_mixed <- list()
-res_fixed <- list()
-mse_train_fixed <- list()
-mse_test_fixed <- list()
-mae_train_fixed <- list()
-mae_test_fixed <- list()
 
 boucle <- foreach(i=1:100, 
                   .combine=cbind, 
                   .packages=c("rockchalk", "dplyr", "lcmm", "doParallel", "foreach")) %dopar%
 {
   Dtrain <- simul()
-  write.csv2(x = Dtrain, file = paste("simulation", as.character(k) ,".csv", sep = ""), row.names = FALSE)
   
   #Modèle oracle sur les Y à effet mixed
   oracle_mixed <- hlme(y_mixed_obs ~ x2_x5 + x4_x7,
                        random=~ x2_x5 + x4_x7,
                        data= Dtrain, subject='individus')
-  save(oracle_mixed, file = paste("oracle_mix", as.character(k) ,".rda", sep = ""))
+  save(oracle_mixed, file = paste("oracle_mix", as.character(i) ,".rda", sep = ""))
   
   beta_k <- oracle_mixed$best[1:3]
   sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
@@ -150,23 +139,24 @@ boucle <- foreach(i=1:100,
   pred_test_fixed <-predict(oracle_fixed, newdata = Dtest)
   mse_test_fixed <- mean((pred_test_fixed - Dtest$y_fixed)^2)
   mae_test_fixed <- mean(abs(pred_test_fixed - Dtest$y_fixed))
-  res <- data.frame("res_mixed" = res_mixed, 
-                    "mae_train_mixed" = mae_train_mixed, 
-                    "mse_train_mixed" = mse_train_mixed, 
-                    "mae_test_mixed" = mae_test_mixed,
-                    "mse_test_mixed" = mse_test_mixed, 
-                    "res_fixed" = res_fixed, 
-                    "mae_train_fixed" = mae_train_fixed, 
-                    "mse_train_fixed" = mse_train_fixed, 
-                    "mae_test_fixed" = mae_test_fixed, 
-                    "mse_test_fixed" = mse_test_fixed)
+  
+  res <- c(res_mixed, mae_train_mixed, mse_train_mixed, mae_test_mixed, mse_test_mixed, 
+                    res_fixed, mae_train_fixed, mse_train_fixed, mae_test_fixed, mse_test_fixed)
+  res <- data.frame(res)
+  rownames(res) <- c("µ_1", "µ_2", "µ_3", "biais µ_1", "biais µ_2", " biais µ_3",
+                     "sigma_1", "sigma_2", "sigma_3", "biais sigma_1", "biais sigma_2", " biais sigma_3",
+                     "mae_train_mixed", "mse_train_mixed", "mae_test_mixed", "mse_test_mixed", 
+                     "beta_1", "beta_2", "beta_3", "biais beta_1", "biais beta_2", "biais beta_3",
+                     "mae_train_fixed", "mse_train_fixed", "mae_test_fixed", "mse_test_fixed")
   #sortie
+  write.csv2(x = Dtrain, file = paste("simulation", as.character(i) ,".csv", sep = ""), row.names = FALSE)
   res
 }
+boucle <-  as.data.frame(t(boucle))
 
 ## Ecrire les résultats
 
-write.csv(x = boucle, "Résultats simulation")
+write.csv(x = boucle, "Résultats simulation.csv")
 
 write.csv(x = truthY, "valeurs Y.csv")
 write.csv(x = truthX, "valeurs X.csv")
