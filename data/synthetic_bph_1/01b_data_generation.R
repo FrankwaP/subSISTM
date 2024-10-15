@@ -72,7 +72,7 @@ simul <- function(
 }
 
 Dtest <- simul()
-write.csv2(x = Dtrain, file = paste(this.dir(), "/Simulations/01_test.csv", sep = ""), row.names = FALSE)
+write.csv2(x = Dtest, file = paste(this.dir(), "/Simulations/01_test.csv", sep = ""), row.names = FALSE)
 
 num_simulations <- 100
 res <- list()
@@ -82,9 +82,8 @@ for (k in 1:num_simulations) {
     x = Dtrain,
     file = paste(this.dir(), "/Simulations/simulation", as.character(k), ".csv", sep = ""), row.names = FALSE
   )
-  oracle_mixed <- lmer(y_mixed_obs ~ x1_x5 + x2_x6 + (x1_x5 + x2_x6 | individus),
-    data = Dtrain
-  )
+
+  oracle_mixed <- lmer(y_mixed_obs ~ x1_x5 + x2_x6 + (x1_x5 + x2_x6 | individus), data = Dtrain)
   sum <- summary(oracle_mixed)
 
   beta_k <- sum$coefficients[, "Estimate"]
