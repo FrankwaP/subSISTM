@@ -10,7 +10,7 @@ library(foreach)
 set.seed(0)
 ## Définition des variables
 
-cl <- makeCluster(10)
+cl <- makeCluster(4)
 registerDoParallel(cl)
 
 ind <- 1:500
@@ -95,7 +95,7 @@ write.csv2(x = Dtest, file = "01_test.csv", row.names = FALSE)
 ## Génération des datasets d'entrainement
 
 
-boucle <- foreach(i=1:100, 
+boucle <- foreach(i=1:8, 
                   .combine=cbind, 
                   .packages=c("rockchalk", "dplyr", "lcmm", "doParallel", "foreach")) %dopar%
 {
@@ -109,10 +109,11 @@ boucle <- foreach(i=1:100,
   
   beta_k <- oracle_mixed$best[1:3]
   sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
+  eps_k <- oracle_mixed$best['stderr']
   
   biais_beta <- beta_k - µ_gamma
   biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
-  res_mixed <- c(beta_k, biais_beta, sigma_k, biais_sigma)
+  res_mixed <- c(beta_k, biais_beta, sigma_k, biais_sigma, eps_k)
   
   pred_train_mixed <- predictY(oracle_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
   mae_train_mixed <- mean(abs(pred_train_mixed$pred[,'pred_ss'] - Dtrain$y_mixed))
@@ -144,7 +145,7 @@ boucle <- foreach(i=1:100,
                     res_fixed, mae_train_fixed, mse_train_fixed, mae_test_fixed, mse_test_fixed)
   res <- data.frame(res)
   rownames(res) <- c("µ_1", "µ_2", "µ_3", "biais µ_1", "biais µ_2", " biais µ_3",
-                     "sigma_1", "sigma_2", "sigma_3", "biais sigma_1", "biais sigma_2", " biais sigma_3",
+                     "sigma_1", "sigma_2", "sigma_3", "biais sigma_1", "biais sigma_2", " biais sigma_3", "sigma_eps",
                      "mae_train_mixed", "mse_train_mixed", "mae_test_mixed", "mse_test_mixed", 
                      "beta_1", "beta_2", "beta_3", "biais beta_1", "biais beta_2", "biais beta_3",
                      "mae_train_fixed", "mse_train_fixed", "mae_test_fixed", "mse_test_fixed")
@@ -152,7 +153,7 @@ boucle <- foreach(i=1:100,
   write.csv2(x = Dtrain, file = paste("simulation", as.character(i) ,".csv", sep = ""), row.names = FALSE)
   res
 }
-boucle <-  as.data.frame(t(boucle))
+
 
 ## Ecrire les résultats
 
