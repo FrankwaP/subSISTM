@@ -1,0 +1,16 @@
+Table: Model performance with several reservoir configurations.
+
+|Model                     |   MAE|  MRE|  MAEB| MREB|
+|:-------------------------|-----:|----:|-----:|----:|
+|Common IS 
+
+ R %>>% O       | 18.63| 0.34| -0.80| 1.00|
+|Common IS 
+
+ I + R %>>% O   | 19.88| 0.33|  0.45| 1.03|
+|Multiple IS 
+
+ R %>>% O     | 16.52| 0.27| -2.91| 0.87|
+|Multiple IS 
+
+ I + R %>>% O | 16.31| 0.26| -3.12| 0.88|
