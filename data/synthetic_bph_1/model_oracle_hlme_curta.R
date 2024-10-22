@@ -1,18 +1,16 @@
 ## Import des bilbiothèques
-  
-  
+
 library(rockchalk)
 library(dplyr)
 library(lcmm)
 library(doParallel)
 library(foreach)
-library(ggplot2)
 library(plyr)
 
 set.seed(0)
 ## Définition des variables
 
-cl <- makeCluster(4)
+cl <- makeCluster(10)
 registerDoParallel(cl)
 
 ind <- 1:500
@@ -94,7 +92,7 @@ Dtest <- simul()
 ## Génération des datasets d'entrainement
 
 
-boucle <- foreach(i=1:4, 
+boucle <- foreach(i=1:100, 
                   .combine=cbind, 
                   .packages=c("rockchalk", "dplyr", "lcmm", "doParallel", "foreach")) %dopar%
 {
@@ -122,19 +120,18 @@ boucle <- foreach(i=1:4,
   mse_test_mixed <- mean((pred_test_mixed$pred[,'pred_ss'] - Dtest$y_mixed)^2)
   mae_test_mixed <- mean(abs(pred_test_mixed$pred[,'pred_ss'] - Dtest$y_mixed))
   
-  #Regression Linéaire avec toutes les variables pour y_mixed
-  naif_mixed <- lm(y_mixed_obs ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
-                   data = Dtrain)
-  sum_naif_mixed <- summary(naif_mixed)
+  #Regression linéaire mixte avec toutes les variables pertinentes pour y_mixed
+  naif_mixed <- hlme(y_mixed_obs ~ x2 + x4 + x5 + x7,
+                     random=~ x2 + x4 + x5 + x7,
+                   data = Dtrain, subject='individus')
   
-  beta_naif_mixed <- sum_naif_mixed$coefficients[,'Estimate']
-  pred_train_naif_mixed <- predict(naif_mixed, newdata = Dtrain)
-  mae_train_naif_mixed <- mean(abs(pred_train_naif_mixed - Dtrain$y_mixed))
-  mse_train_naif_mixed <- mean((pred_train_naif_mixed - Dtrain$y_mixed)^2)
+  pred_train_naif_mixed <- predictY(naif_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_train_naif_mixed <- mean(abs(pred_train_naif_mixed$pred[,'pred_ss'] - Dtrain$y_mixed))
+  mse_train_naif_mixed <- mean((pred_train_naif_mixed$pred[,'pred_ss'] - Dtrain$y_mixed)^2)
   
-  pred_test_naif_mixed <- predict(naif_mixed, newdata = Dtest)
-  mae_test_naif_mixed <- mean(abs(pred_test_naif_mixed - Dtest$y_mixed))
-  mse_test_naif_mixed <- mean((pred_test_naif_mixed - Dtest$y_mixed)^2)
+  pred_test_naif_mixed <- predictY(naif_mixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_test_naif_mixed <- mean(abs(pred_test_naif_mixed$pred[,'pred_ss'] - Dtest$y_mixed))
+  mse_test_naif_mixed <- mean((pred_test_naif_mixed$pred[,'pred_ss'] - Dtest$y_mixed)^2)
   
   #Modèle oracle sur les Y à effet fixes
   oracle_fixed <- lm(y_fixed_obs ~ x2_x5 + x4_x7, data=Dtrain)
@@ -156,9 +153,7 @@ boucle <- foreach(i=1:4,
   #Regression Linéaire avec toutes les variables pour y_fixed
   naif_fixed <- lm(y_fixed_obs ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
                    data = Dtrain)
-  sum_naif_fixed <- summary(naif_fixed)
   
-  beta_naif_fixed <- sum_naif_fixed$coefficients[,'Estimate']
   pred_train_naif_fixed <- predict(naif_fixed, newdata = Dtrain)
   mae_train_naif_fixed <- mean(abs(pred_train_naif_fixed - Dtrain$y_fixed))
   mse_train_naif_fixed <- mean((pred_train_naif_fixed - Dtrain$y_fixed)^2)
@@ -171,21 +166,17 @@ boucle <- foreach(i=1:4,
   #Aggregating results
   res <- c(res_mixed, #contains values for µ_k, sigma_k, their biais and sigma_eps (13 values)
            mae_train_mixed, mse_train_mixed, mae_test_mixed, mse_test_mixed,
-           beta_naif_mixed, #contains values for beta_naïf (9 values)
            mae_train_naif_mixed, mse_train_naif_mixed, mae_test_naif_mixed, mse_test_naif_mixed,
            res_fixed, #contains values for beta_k and its biais, 6 values
            mae_train_fixed, mse_train_fixed, mae_test_fixed, mse_test_fixed,
-           beta_naif_fixed, #contains values for beta_naïf (9 values)
            mae_train_naif_fixed, mse_train_naif_fixed, mae_test_naif_fixed, mse_test_naif_fixed)
   res <- data.frame(res)
-  rownames(res) <- c("µ_1", "µ_2", "µ_3", "biais µ_1", "biais µ_2", " biais µ_3",
-                     "sigma_1", "sigma_2", "sigma_3", "biais sigma_1", "biais sigma_2", " biais sigma_3", "sigma_eps",
+  rownames(res) <- c("µ_1", "µ_2", "µ_3", "biais µ_1", "biais µ_2", "biais µ_3",
+                     "sigma_1", "sigma_2", "sigma_3", "biais sigma_1", "biais sigma_2", "biais sigma_3", "sigma_eps",
                      "mae_train_mixed", "mse_train_mixed", "mae_test_mixed", "mse_test_mixed",
-                     "beta_naïf_0", "beta_naïf_1", "beta_naïf_2", "beta_naïf_3", "beta_naïf_4", "beta_naïf_5", "beta_naïf_6", "beta_naïf_7", "beta_naïf_8",
                      "mae_train_naif_mixed", "mse_train_naif_mixed", "mae_test_naif_mixed", "mse_test_naif_mixed",
                      "beta_1", "beta_2", "beta_3", "biais beta_1", "biais beta_2", "biais beta_3",
                      "mae_train_fixed", "mse_train_fixed", "mae_test_fixed", "mse_test_fixed",
-                     "B_naif_fixed_0", "B_naif_fixed_1", "B_naif_fixed_2", "B_naif_fixed_3", "B_naif_fixed_4", "B_naif_fixed_5", "B_naif_fixed_6", "B_naif_fixed_7", "B_naif_fixed_8",
                      "mae_train_naif_fixed", "mse_train_naif_fixed", "mae_test_naif_fixed", "mse_test_naif_fixed")
   
   
@@ -213,7 +204,7 @@ predictions <- join_all(boucle[2,], by=c('individus','temps'))
                              
 ## Ecrire les résultats
 write.csv2(x = Dtest, file = "01_test.csv", row.names = FALSE)
-write.csv(x = predictions, file = "Predictions")
+write.csv(x = predictions, file = "Predictions.csv")
 write.csv(x = results, "Résultats simulation.csv")
 write.csv(x = truthY, "valeurs Y.csv")
 write.csv(x = truthX, "valeurs X.csv")
