@@ -6,18 +6,22 @@ library(lcmm)
 library(doParallel)
 library(foreach)
 library(plyr)
-
+library(reshape)
 set.seed(0)
 ## Définition des variables
 
-cl <- makeCluster(10)
+cl <- makeCluster(4)
 registerDoParallel(cl)
 
 ind <- 1:500
-time <- 0:25
-l <- list(ind, time)
-dataframe <- rev(expand.grid(rev(l)))
-colnames(dataframe) <- c("individus", "temps")
+dataframe <- as.data.frame(matrix(runif(13000,0,25), nrow = 500))
+dataframe <- cbind(individus = as.numeric(rownames(dataframe)), dataframe)
+dataframe <- melt(dataframe, id = 'individus')
+dataframe <- dataframe[with(dataframe, order(individus, value)),]
+dataframe <- dataframe[,c('individus', 'value')]
+colnames(dataframe) <- c('individus', 'temps')
+rownames(dataframe) <- NULL
+
 # Epsilon
 sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.5, 1, 0.5, 1)
 
@@ -92,7 +96,7 @@ Dtest <- simul()
 ## Génération des datasets d'entrainement
 
 
-boucle <- foreach(i=1:100, 
+boucle <- foreach(i=1:4, 
                   .combine=cbind, 
                   .packages=c("rockchalk", "dplyr", "lcmm", "doParallel", "foreach")) %dopar%
 {
@@ -129,9 +133,9 @@ boucle <- foreach(i=1:100,
   me_test_mixed_obs <- mean(pred_test_mixed$pred[,'pred_ss'] - Dtest$y_mixed_obs)
   
   #Regression linéaire mixte avec toutes les variables pertinentes pour y_mixed
-  naif_mixed <- hlme(y_mixed_obs ~ x2 + x4 + x5 + x7,
-                     random=~ x2 + x4 + x5 + x7,
-                   data = Dtrain, subject='individus')
+  naif_mixed <- hlme(y_mixed_obs ~ temps + temps**2 + temps**3 + temps**4,
+                     random=~ temps + temps**2 + temps**3 + temps**4,
+                     data = Dtrain, subject='individus')
   
   pred_train_naif_mixed <- predictY(naif_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
   mae_train_naif_mixed_truth <- mean(abs(pred_train_naif_mixed$pred[,'pred_ss'] - Dtrain$y_mixed))
@@ -224,8 +228,7 @@ boucle <- foreach(i=1:100,
   Dtrain[,"pred_naif_mixed"] <- pred_train_naif_mixed$pred[,'pred_ss']
   Dtrain[,"pred_naif_fixed"] <- pred_train_naif_fixed
   
-  Pred_test_k <- rev(expand.grid(rev(l)))
-  colnames(Pred_test_k) <- c("individus", "temps")
+  Pred_test_k <- Dtest[,c("individus", "temps")]
   Pred_test_k[,paste("pred_mixed", k, sep="_")] <- pred_test_mixed$pred[,'pred_ss']
   Pred_test_k[,paste("pred_fixed", k, sep="_")] <- pred_test_fixed
   Pred_test_k[,paste("pred_naif_mixed", k, sep="_")] <- pred_test_naif_mixed$pred[,'pred_ss']

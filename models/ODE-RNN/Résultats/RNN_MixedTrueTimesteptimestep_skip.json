@@ -1,1 +1,0 @@
-{"Random effect":{"0":true},"Model":{"0":{"T_destination":{},"call_super_init":false,"dump_patches":false}},"nb_epochs":{"0":436},"MAE moyenne sur l'entrainement":{"0":16.5500058461},"MAE moyenne sur le test":{"0":17.4691187195}}

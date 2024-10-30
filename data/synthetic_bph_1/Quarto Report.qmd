@@ -23,32 +23,46 @@ Prédiction: predictY( oracle_mixed, newdata = Dtest, var.time = 'temps', marg =
 
 ## Import des résultats
 
+```{r}
+res <- read.csv(file = paste(this.dir(), "/Résultats R script/Résultats simulation.csv", sep = ""), sep=',')
+X <- read.csv(file = paste(this.dir(), "/Résultats R script/valeurs X.csv", sep = ""), sep=',')
+Y <- read.csv(file = paste(this.dir(), "/Résultats R script/valeurs Y.csv", sep = ""), sep=',')
+```
+
 ```{r, echo: false}
-MAE_train_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE train fixed.csv", sep = ""), sep=',')
-MAE_test_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE test fixed.csv", sep = ""), sep=',')
-MSE_train_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE train fixed.csv", sep = ""), sep=',')
-MSE_test_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE test fixed.csv", sep = ""), sep = ',')
-Valeurs_Biais_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/Valeurs et Biais fixed.csv", sep = ""), sep = ',')
-MAE_train_mixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE train mixed.csv", sep = ""), sep=',')
-MAE_test_mixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MAE test mixed.csv", sep = ""), sep=',')
-MSE_train_fixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE train.csv", sep = ""), sep=',')
-MSE_test_mixed <- read.csv(file = paste(this.dir(), "/Résultats R script/MSE test mixed.csv", sep = ""), sep = ',')
-Valeurs_Biais_mixed <- read.csv(file = paste(this.dir(), "/Résultats R script/Valeurs et Biais mixed.csv", sep = ""), sep = ',')
+MAE_train_fixed <- res$mae_train_fixed
+MAE_test_fixed <- res$mae_test_fixed
+MSE_train_fixed <- res$mse_train_fixed
+MSE_test_fixed <- res$mse_test_fixed
+MAE_train_mixed <- res$mae_train_mixed
+MAE_test_mixed <- res$mae_test_mixed
+MSE_train_mixed <- res$mse_train_mixed
+MSE_test_mixed <- res$mse_test_mixed
+MAE_train_naïf_mixed <- res$mae_train_naif_mixed
+MSE_train_naïf_mixed <- res$mse_train_naif_mixed
+MAE_test_naïf_mixed <- res$mae_test_naif_mixed
+MSE_test_naïf_mixed <- res$mse_test_naif_mixed
+MAE_train_naïf_fixed <- res$mae_train_naif_fixed
+MSE_train_naïf_fixed <- res$mse_train_naif_fixed
+MAE_test_naïf_fixed <- res$mae_test_naif_fixed
+MSE_test_naïf_fixed <- res$mse_test_naif_fixed
 ```
 
 ## Valeurs moyennes des effets
 
 ```{r, echo:false}
-val_moy_mixed <- colMeans(Valeurs_Biais_mixed[c('µ.Gamma1','µ.Gamma2','µ.Gamma3','sigma.Gamma1','sigma.Gamma2','sigma.Gamma3')])
+val_moy_mixed <- colMeans(res[c('µ_1','µ_2','µ_3','sigma_1','sigma_2','sigma_3', 'sigma_eps')])
 val_moy_mixed
+val_moy_fixed <- colMeans(res[c('beta_1','beta_2','beta_3')])
+val_moy_fixed
 
 ```
 
-## Biais moyens
+## biais moyens
 
 ```{r}
-biais_moy_mixed <-colMeans(Valeurs_Biais_mixed[c('Biais.µ.Gamma.1','Biais.µ.Gamma.2','Biais.µ.Gamma3','Biais.sigma.Gamma1','Biais.sigma.Gamma.2','Biais.sigma.Gamma3')])
-biais_moy_fixed <-colMeans(Valeurs_Biais_fixed[c('Biais.µ.Gamma.1','Biais.µ.Gamma.2','Biais.µ.Gamma3','Biais.sigma.Gamma1','Biais.sigma.Gamma.2','Biais.sigma.Gamma3')])
+biais_moy_mixed <-colMeans(res[,c('biais.µ_1','biais.µ_2','biais.µ_3','biais.sigma_1','biais.sigma_2','biais.sigma_3')])
+biais_moy_fixed <-colMeans(res[c('biais.beta_1','biais.beta_2','biais.beta_3')])
 biais_moy_mixed
 biais_moy_fixed
 ```
@@ -56,14 +70,22 @@ biais_moy_fixed
 ## Performances moyennes
 
 ```{r, echo:false}
-perf_moy_mixed <- data.frame('MAE_train' = mean(MAE_train_mixed$MAE),
-                       'MAE_test' = mean(MAE_test_mixed$MAE),
-                       'MSE_train' = mean(MSE_train_mixed$MSE),
-                       'MSE_test' = mean(MSE_test_mixed$MSE))
-perf_moy_fixed <- data.frame('MAE_train' = mean(MAE_train_fixed$MAE),
-                       'MAE_test' = mean(MAE_test_fixed$MAE),
-                       'MSE_train' = mean(MSE_train_fixed$MSE),
-                       'MSE_test' = mean(MSE_test_fixed$MSE))
+perf_moy_mixed <- data.frame('MAE_train_oracle' = mean(MAE_train_mixed),
+                       'MAE_test_oracle' = mean(MAE_test_mixed),
+                       'MSE_train_oracle' = mean(MSE_train_mixed),
+                       'MSE_test_oracle' = mean(MSE_test_mixed),
+                       'MAE_train_naïf' = mean(MAE_train_naïf_mixed),
+                       'MAE_test_naïf' = mean(MAE_test_naïf_mixed),
+                       'MSE_train_naïf' = mean(MSE_train_naïf_mixed),
+                       'MSE_test_naïf' = mean(MSE_test_naïf_mixed))
+perf_moy_fixed <- data.frame('MAE_train_oracle' = mean(MAE_train_fixed),
+                       'MAE_test_oracle' = mean(MAE_test_fixed),
+                       'MSE_train_oracle' = mean(MSE_train_fixed),
+                       'MSE_test_oracle' = mean(MSE_test_fixed),
+                       'MAE_train_naïf' = mean(MAE_train_naïf_fixed),
+                       'MAE_test_naïf' = mean(MAE_test_naïf_fixed),
+                       'MSE_train_naïf' = mean(MSE_train_naïf_fixed),
+                       'MSE_test_naïf' = mean(MSE_test_naïf_fixed))
 perf_moy_mixed
 perf_moy_fixed
 ```

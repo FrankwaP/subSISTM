@@ -10,20 +10,18 @@ library(lcmm)
 set.seed(0)
 
 ## Définition des variables
-
 ind <- 1:500
 time <- 0:25
 l <- list(ind, time)
 dataframe <- rev(expand.grid(rev(l)))
 colnames(dataframe) <- c("individus", "temps")
-k <- 7
 # Epsilon
-sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.002, 0.05, 0.005, 0.1)
+sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.5, 1, 0.5, 1)
 
 # X
-mu0 <- runif(k, -10, 10)
+mu0 <- runif(7, -10, 10)
 sig0 <- diag(c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
-mu1 <- runif(k, -1, 1) 
+mu1 <- runif(7, -1, 1) 
 sig1 <- diag(c(0.5, 0.5, 0.1, 0.5, 1, 0.1, 0.5))
 truthX <- data.frame("µ0"=mu0, "µ1" = mu1, "sigma0"=diag(sig0), "sigma1"=diag(sig1))
 rownames(truthX) <- c('X1','X2','X3','X4','X5','X6','X7')
@@ -31,9 +29,7 @@ rownames(truthX) <- c('X1','X2','X3','X4','X5','X6','X7')
 # Y
 µ_gamma <- runif(3, -1, 1)
 sdgamma <- diag(c(0.5, 0.5, 0.05))
-truthY <- data.frame('µ' = µ_gamma, 'sigma²' = diag(sdgamma), 'var_eps' = sigma_epsilon[8])
-rownames(truthY) <- c('intercept', 'beta1', 'beta2')
-
+truthY <- data.frame('µ' = µ_gamma, 'sigma²' = sdgamma, 'var_eps' = sigma_epsilon[8])
 
 ## Fonction simul()
 
