@@ -4,6 +4,10 @@ __pycache__/
 *$py.class
 .vscode
 
+.flake8
+.lintr
+.virtual_documents
+
 #Workspace R
 .RData
 .Rhistory
