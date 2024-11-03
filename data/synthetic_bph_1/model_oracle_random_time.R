@@ -10,7 +10,7 @@ library(reshape)
 set.seed(0)
 ## Définition des variables
 
-cl <- makeCluster(4)
+cl <- makeCluster(10)
 registerDoParallel(cl)
 
 ind <- 1:500
@@ -96,7 +96,7 @@ Dtest <- simul()
 ## Génération des datasets d'entrainement
 
 
-boucle <- foreach(i=1:4, 
+boucle <- foreach(i=1:100, 
                   .combine=cbind, 
                   .packages=c("rockchalk", "dplyr", "lcmm", "doParallel", "foreach")) %dopar%
 {
