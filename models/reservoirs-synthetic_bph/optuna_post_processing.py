@@ -56,6 +56,35 @@ def remove_warmups(
     return pred_dataframe[pred_dataframe[timestep_column_name] > times[N_warmups]]
 
 
+def get_statistics(
+    pred_dataframe: DataFrame,
+    serie_column_name: str,
+    timestep_column_name: str,
+    N_warmups: int,
+) -> None:
+
+    err_name = [c for c in pred_dataframe.columns if c.startswith("error")]
+    data = remove_warmups(pred_dataframe, timestep_column_name, N_warmups)
+
+    mae_seeds = data[err_name].abs().mean(axis=1)
+    mse_seeds = (data[err_name] ** 2).mean(axis=1)
+
+    mae_global = data[err_name].abs().mean(axis=0).mean()
+    print(f"\tMAE: {mae_global}")
+    mse_global = (data[err_name] ** 2).mean(axis=0).mean()
+    print(f"\tMSE: {mse_global}")
+
+    plot_data = DataFrame()
+
+    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(5 * 2, 5))
+    sns.boxplot(mae_seeds, ax=axs[0])
+    axs[0].set_yscale("log")
+    axs[0].set_title(f"MAE = {mae_global:2g}")
+    sns.boxplot(mse_seeds, ax=axs[1])
+    axs[1].set_yscale("log")
+    axs[1].set_title(f"MSE = {mse_global:2g}")
+
+
 def get_worst_individuals(
     pred_dataframe: DataFrame,
     serie_column_name: str,
