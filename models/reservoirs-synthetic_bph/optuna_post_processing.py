@@ -35,9 +35,7 @@ def get_predictions_dataframe(
     data_test = data_test.copy()
     ###
     err_cols = []
-    for seed, pred in enumerate(
-        get_2D_prediction_list(model_list, processed_data, n_cpus)
-    ):
+    for seed, pred in enumerate(get_2D_prediction_list(model_list, processed_data, n_cpus)):
         pred_name = f"prediction-{seed}"
         data_test.loc[:, pred_name] = pred
         err_name = f"error-{seed}"
@@ -74,8 +72,6 @@ def get_statistics(
     mse_global = (data[err_name] ** 2).mean(axis=0).mean()
     print(f"\tMSE: {mse_global}")
 
-    plot_data = DataFrame()
-
     fig, axs = plt.subplots(nrows=1, ncols=2, figsize=(5 * 2, 5))
     sns.boxplot(mae_seeds, ax=axs[0])
     axs[0].set_yscale("log")
@@ -92,9 +88,7 @@ def get_worst_individuals(
     N_warmups: int,
     N_worst: int,
 ) -> list[int]:
-    print(
-        f"Returning the {N_worst} worst MAE individuals (mean over seeds and timesteps)."
-    )
+    print(f"Returning the {N_worst} worst MAE individuals (mean over seeds and timesteps).")
     return (
         remove_warmups(pred_dataframe, timestep_column_name, N_warmups)
         .loc[:, [serie_column_name, "mean-absolute-error"]]
@@ -134,9 +128,7 @@ def plot_individual_results(
 
     AX, PREFIX = 1, "error"
     list_cols = [c for c in indiv_dataframe.columns if c.startswith(PREFIX)]
-    plot_dataframe = indiv_dataframe[
-        [serie_column_name, timestep_column_name] + list_cols
-    ]
+    plot_dataframe = indiv_dataframe[[serie_column_name, timestep_column_name] + list_cols]
     plot_dataframe.loc[:, list_cols] = plot_dataframe[list_cols].abs()
     axs[AX].set_yscale("log")
     _plot_individual_single_result(
