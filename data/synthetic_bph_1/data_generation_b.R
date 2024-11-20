@@ -7,21 +7,18 @@ library(doParallel)
 library(foreach)
 library(plyr)
 library(reshape)
+library(ggplot2)
 set.seed(0)
 ## Définition des variables
 
-cl <- makeCluster(3)
+cl <- makeCluster(4)
 registerDoParallel(cl)
 
 ind <- 1:500
-dataframe <- as.data.frame(matrix(runif(13000,0,25), nrow = 500))
-dataframe <- cbind(individus = as.numeric(rownames(dataframe)), dataframe)
-dataframe <- melt(dataframe, id = 'individus')
-dataframe <- dataframe[with(dataframe, order(individus, value)),]
-dataframe <- dataframe[,c('individus', 'value')]
-colnames(dataframe) <- c('individus', 'temps')
-rownames(dataframe) <- NULL
-
+time <- 0:25
+l <- list(ind, time)
+dataframe <- rev(expand.grid(rev(l)))
+colnames(dataframe) <- c("individus", "temps")
 # Epsilon
 sigma_epsilon <- c(0.5, 0.1, 0.1, 0.1, 0.5, 1, 0.5, 1)
 
@@ -74,7 +71,7 @@ simul <- function(
   df$y_mixed <- g_mixed[df$individus, 1] +
     g_mixed[df$individus, 2] * df$x2 * df$x5 +
     g_mixed[df$individus, 3] * df$x4 * df$x7 +
-    g_mixed[df$individus, 4] * df$x5 * df$x8
+    g_mixed[df$individus, 4] * df$x6 * df$x8
   
   df$y_mixed_obs <- df$y_mixed + rnorm(length(df$y_mixed), 0, sigeps[8])
   
@@ -82,7 +79,7 @@ simul <- function(
   df$y_fixed <- g_fixed[df$individus, 1] + 
     g_fixed[df$individus, 2] * df$x2 * df$x5 + 
     g_fixed[df$individus, 3] * df$x4 * df$x7 +
-    g_fixed[df$individus, 4] * df$x5 * df$x8
+    g_fixed[df$individus, 4] * df$x6 * df$x8
   
   
   df$y_fixed_obs <- df$y_fixed + rnorm(length(df$y_fixed), 0, sigeps[8])
@@ -96,10 +93,7 @@ simul <- function(
 
 Dtest <- simul()
 
-## Génération des datasets d'entrainement
-
-
-boucle <- foreach(i=1:3, 
+boucle <- foreach(i=1:2, 
                   .combine=cbind, 
                   .packages=c("rockchalk", "dplyr", "lcmm", "doParallel", "foreach")) %dopar%
 {
@@ -111,13 +105,13 @@ boucle <- foreach(i=1:3,
                        data= Dtrain, subject='individus')
   save(oracle_mixed, file = paste("oracle_mix", k ,".rda", sep = ""))
   
-  beta_fix <- oracle_mixed$best[1:3]
-  sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
-  eps_k <- oracle_mixed$best['stderr']
+  #beta_fix <- oracle_mixed$best[1:4]
+  #sigma_k <- oracle_mixed$best[c('varcov 1','varcov 3','varcov 6')]
+  #eps_k <- oracle_mixed$best['stderr']
   
-  biais_beta <- beta_fix - µ_gamma
-  biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
-  res_mixed <- c(beta_fix, biais_beta, sigma_k, biais_sigma, eps_k)
+  #biais_beta <- beta_fix - µ_gamma
+  #biais_sigma <- sigma_k - c(0.5, 0.5, 0.05)
+  #res_mixed <- c(beta_fix, biais_beta, sigma_k, biais_sigma, eps_k)
   
   pred_train_mixed <- predictY(oracle_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
   mae_train_mixed_truth <- mean(abs(pred_train_mixed$pred[,'pred_ss'] - Dtrain$y_mixed))
@@ -149,8 +143,8 @@ boucle <- foreach(i=1:3,
   mse_test_naif_mixed_obs <- mean((pred_test_naif_mixed$pred[,'pred_ss'] - Dtest$y_mixed_obs)^2)
   
   #regression linéaire mixe sur chaque variable sans interraction
-  lin_mixed <- hlme(y_mixed_obs ~ x1 + x2 + x4 + x5 + x6 + x7 + x8,
-                    random=~ x1 + x2 + x4 + x5 + x6 + x7 + x8,
+  lin_mixed <- hlme(y_mixed_obs ~ x2 + x4 + x5 + x6 + x7 + x8,
+                    random=~ x2 + x4 + x5 + x6 + x7,
                     data = Dtrain, subject='individus')
   
   pred_train_lin_mixed <- predictY(lin_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
@@ -170,9 +164,9 @@ boucle <- foreach(i=1:3,
   sum_fix <- summary(oracle_fixed)
   save(oracle_fixed, file = paste("oracle_fix", k ,".rda", sep = ""))
   
-  beta_fix <- sum_fix$coefficients[,'Estimate']
-  biais_beta <- beta_fix - µ_gamma
-  res_fixed <- c(beta_fix, biais_beta)
+  #beta_fix <- sum_fix$coefficients[,'Estimate']
+  #biais_beta <- beta_fix - µ_gamma
+  #res_fixed <- c(beta_fix, biais_beta)
   
   pred_train_fixed <- predict(oracle_fixed, newdata = Dtrain)
   mae_train_fixed_truth <- mean(abs(pred_train_fixed - Dtrain$y_fixed))
@@ -203,31 +197,25 @@ boucle <- foreach(i=1:3,
   mse_test_naif_fixed_obs <- mean((pred_test_naif_fixed - Dtest$y_fixed_obs)^2)
   
   #Aggregating results
-  res <- c(res_mixed, #contains values for µ_k, sigma_k, their biais and sigma_eps (13 values)
-           mae_train_mixed_truth, mse_train_mixed_truth, mae_test_mixed_truth, mse_test_mixed_truth,
+  res <- c(mae_train_mixed_truth, mse_train_mixed_truth, mae_test_mixed_truth, mse_test_mixed_truth,
            mae_train_naif_mixed_truth, mse_train_naif_mixed_truth, mae_test_naif_mixed_truth, mse_test_naif_mixed_truth,
            mae_train_mixed_obs, mse_train_mixed_obs, mae_test_mixed_obs, mse_test_mixed_obs,
            mae_train_naif_mixed_obs, mse_train_naif_mixed_obs, mae_test_naif_mixed_obs, mse_test_naif_mixed_obs,
            mae_train_lin_mixed_obs, mse_train_lin_mixed_obs, mae_test_lin_mixed_obs, mse_test_lin_mixed_obs,
-           res_fixed, #contains values for beta_k and its biais, 6 values
            mae_train_fixed_truth, mse_train_fixed_truth, mae_test_fixed_truth, mse_test_fixed_truth,
            mae_train_naif_fixed_truth, mse_train_naif_fixed_truth, mae_test_naif_fixed_truth, mse_test_naif_fixed_truth,
            mae_train_fixed_obs, mse_train_fixed_obs, mae_test_fixed_obs, mse_test_fixed_obs,
            mae_train_naif_fixed_obs, mse_train_naif_fixed_obs, mae_test_naif_fixed_obs, mse_test_naif_fixed_obs)
   res <- data.frame(res)
-  rownames(res) <- c("µ_1", "µ_2", "µ_3", "biais µ_1", "biais µ_2", "biais µ_3",
-                     "sigma_1", "sigma_2", "sigma_3", "biais sigma_1", "biais sigma_2", "biais sigma_3", "sigma_eps",
-                     "mae_train_mixed_truth", "mse_train_mixed_truth", "mae_test_mixed_truth", "mse_test_mixed_truth",
+  rownames(res) <- c("mae_train_mixed_truth", "mse_train_mixed_truth", "mae_test_mixed_truth", "mse_test_mixed_truth",
                      "mae_train_naif_mixed_truth", "mse_train_naif_mixed_truth", "mae_test_naif_mixed_truth", "mse_test_naif_mixed_truth",
                      "mae_train_mixed_obs", "mse_train_mixed_obs", "mae_test_mixed_obs", "mse_test_mixed_obs",
                      "mae_train_naif_mixed_obs", "mse_train_naif_mixed_obs", "mae_test_naif_mixed_obs", "mse_test_naif_mixed_obs",
                      "mae_train_lin_mixed_obs", "mse_train_lin_mixed_obs", "mae_test_lin_mixed_obs", "mse_test_lin_mixed_obs",
-                     "beta_1", "beta_2", "beta_3", "biais beta_1", "biais beta_2", "biais beta_3",
                      "mae_train_fixed_truth", "mse_train_fixed_truth", "mae_test_fixed_truth", "mse_test_fixed_truth",
                      "mae_train_naif_fixed_truth", "mse_train_naif_fixed_truth", "mae_test_naif_fixed_truth", "mse_test_naif_fixed_truth",
                      "mae_train_fixed_obs", "mse_train_fixed_obs", "mae_test_fixed_obs", "mse_test_fixed_obs",
                      "mae_train_naif_fixed_obs", "mse_train_naif_fixed_obs", "mae_test_naif_fixed_obs", "mse_test_naif_fixed_obs")
-  
   
   Dtrain[,"pred_mixed"] <- pred_train_mixed$pred[,'pred_ss']
   Dtrain[,"pred_fixed"] <- pred_train_fixed
@@ -252,8 +240,8 @@ results <- bind_cols(boucle[1,])
 results <- as.data.frame(t(results))
 predictions <- join_all(boucle[2,], by=c('individus','temps'))
 
-val_moy <- colMeans(results[c('µ_1','µ_2','µ_3','sigma_1','sigma_2','sigma_3','sigma_eps','beta_1','beta_2','beta_3')])
-val_moy <- as.data.frame(t(val_moy))
+#val_moy <- colMeans(results[c('µ_1','µ_2','µ_3','sigma_1','sigma_2','sigma_3','sigma_eps','beta_1','beta_2','beta_3')])
+#val_moy <- as.data.frame(t(val_moy))
 scores <- results[,c("mae_train_mixed_truth", "mse_train_mixed_truth", "mae_test_mixed_truth", "mse_test_mixed_truth",
                      "mae_train_naif_mixed_truth", "mse_train_naif_mixed_truth", "mae_test_naif_mixed_truth", "mse_test_naif_mixed_truth",
                      "mae_train_mixed_obs", "mse_train_mixed_obs", "mae_test_mixed_obs", "mse_test_mixed_obs",
@@ -271,7 +259,7 @@ write.csv(x = predictions, file = "Predictions.csv")
 write.csv(x = results, "Résultats simulation.csv")
 write.csv(x = truthY, "valeurs Y.csv")
 write.csv(x = truthX, "valeurs X.csv")
-write.csv(x = val_moy, file = "valeurs_moyennes.csv")
+#write.csv(x = val_moy, file = "valeurs_moyennes.csv")
 write.csv(x = scores_moy, file = "Performances_moyennes.csv")
 
 stopCluster(cl)

@@ -26,7 +26,7 @@ echo "#############################"
 # on charge R
 module load R/4.2.0
 # on lance le script Modele1.R
-R CMD BATCH model_oracle_random_time.R
+R CMD BATCH data_generation_b.R
 # c’est fini
 echo seff $SLURM_JOB_ID
 echo "Date:" ‘date‘
