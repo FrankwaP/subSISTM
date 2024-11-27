@@ -16,6 +16,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import RobustScaler
 import json
 from joblib import Parallel, delayed
+import os
 
 #Class: RNN
 class RNN(nn.Module):
@@ -45,7 +46,7 @@ random.seed(0)
 TRAINING_NUMBER = 400
 USE_NOISY_DATA = False
 USE_MIXED_EFFECT = True
-RANDOM_TIME = False
+RANDOM_TIME = True
 MODEL = RNN        
 RE = 'Mixed' if USE_MIXED_EFFECT else 'Fixed'
 Time = 'random time' if RANDOM_TIME else 'regular time'
@@ -59,6 +60,7 @@ MSE_train_sims_obs = []
 MAE_test_sims_obs = []
 MSE_test_sims_obs = []
 
+
 def rnn_train_test(n_set):
 
     res_loop = {}
@@ -66,6 +68,9 @@ def rnn_train_test(n_set):
     CSV_FILE = "../../data/synthetic_bph_1/Simulations " + Time + "/simulation" + str(n_set) + ".csv"
     CSV_Dtest = "../../data/synthetic_bph_1/Simulations " + Time + "/01_test.csv"
     CSV_RES_R = "../../data/synthetic_bph_1/Résultats " + Time
+    CSV_FILE = os.path.join(os.path.dirname(__file__), CSV_FILE)
+    CSV_Dtest = os.path.join(os.path.dirname(__file__), CSV_Dtest)
+    CSV_RES_R = os.path.join(os.path.dirname(__file__), CSV_RES_R)
     #data loading
     data = pd.read_csv(CSV_FILE, sep=";", decimal=",")
     dtest = pd.read_csv(CSV_Dtest, sep=";", decimal=",")
@@ -96,8 +101,8 @@ def rnn_train_test(n_set):
     data_val = data_norm[~data_norm['individus'].isin(N_train)]
 
     scaler_x = RobustScaler()
-    data_train.loc[:,x_labels] = scaler_x.fit_transform(data_train[x_labels])
-    data_val.loc[:,x_labels] = scaler_x.transform(data_val[x_labels ])
+    data_train.loc[:,x_labels[:-1]] = scaler_x.fit_transform(data_train[x_labels[:-1]])
+    data_val.loc[:,x_labels[:-1]] = scaler_x.transform(data_val[x_labels[:-1]])
 
     scaler_y = RobustScaler()
     data_train.loc[:,y_labels] = scaler_y.fit_transform(data_train[y_labels])
@@ -120,10 +125,10 @@ def rnn_train_test(n_set):
     dtest_norm = dtest.copy()
     dtest_norm = dtest_norm.dropna()
 
-    scaler_x_test = RobustScaler()
-    dtest_norm.loc[:,x_labels] = scaler_x.fit_transform(dtest_norm[x_labels])
+    #scaler_x_test = RobustScaler()
+    dtest_norm.loc[:,x_labels[:-1]] = scaler_x.fit_transform(dtest_norm[x_labels[:-1]])
 
-    scaler_y_test = RobustScaler()
+    #scaler_y_test = RobustScaler()
     dtest_norm.loc[:,y_labels] = scaler_y.fit_transform(dtest_norm[y_labels])
 
     groupby = dtest_norm.groupby('individus')[x_labels].apply(np.array)
@@ -168,6 +173,17 @@ def rnn_train_test(n_set):
         min_loss = cur_loss_val
 
     loss_val = loss_val[101:]
+    if n_set == 1:
+
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.plot(loss_train, label ="loss")
+        plt.plot(loss_val, label = "validation")
+        plt.legend()
+        p = "../../models/ODE-RNN/Résultats/Graphs/Loss_RNN_" + RE +".png"
+        p = os.path.join(os.path.dirname(__file__), p)
+        plt.savefig(p)
+
 
     #unscale data and aggregate training set
     multi_index = pd.MultiIndex.from_product([N_train, range(y_pred.shape[1])], names=['individus', 'temps'])
@@ -225,7 +241,9 @@ def rnn_train_test(n_set):
         MAE_list_test_obs.append(MAE(pred_k,target_k_obs))
         MSE_list_test_obs.append(MSE(pred_k,target_k_obs))
 
-    torch.save(model.state_dict(), "../../models/ODE-RNN/Résultats/Parameters/POIDS_"+ MODEL.__name__ + "_" + RE + Time + "_" + str(n_set))
+    p = "../../models/ODE-RNN/Résultats/Parameters/POIDS_"+ MODEL.__name__ + "_" + RE + Time + "_" + str(n_set)
+    p = os.path.join(os.path.dirname(__file__), p)
+    torch.save(model.state_dict(), p)
 
     #On met tous les résultats dans un dictionnaire
     res_loop['df'] = df
@@ -238,20 +256,22 @@ def rnn_train_test(n_set):
     res_loop['MSE test'] = np.mean(MSE_list_test)
     res_loop['MAE test obs'] = np.mean(MAE_list_test_obs)
     res_loop['MSE test obs'] = np.mean(MSE_list_test_obs)
+    print(n_set)
+    if n_set == 1:
+        p = "../../models/ODE-RNN/Résultats/"
+        p = os.path.join(os.path.dirname(__file__), p)
+        df.to_csv(p + "Prédictions_entrainement" + MODEL.__name__ + "_" + RE + Time + ".csv", index=False)
+        df_test.to_csv(p + "Prédictions_test" + MODEL.__name__ + "_" + RE + Time + ".csv", index=False)
     return (res_loop)
 
-res = Parallel(n_jobs=4)(delayed(rnn_train_test)(n_set = i) for i in range(1,11))
+res = Parallel(n_jobs=6)(delayed(rnn_train_test)(n_set = i) for i in range(1,21))
 
 metrics =  ['MAE train', 'MSE train', 'MAE train obs', 'MSE train obs', 'MAE test', 'MSE test', 'MAE test obs', 'MSE test obs']
 scores = [{k:x[k] for k in metrics} for x in res]
 scores = pd.DataFrame(scores)
 
-df = res[-1]['df']
-df_test = res[-1]['df test']
-
-#df.to_csv("../../models/ODE-RNN/Résultats/Prédictions_entrainement" + MODEL.__name__ + "_" + RE + Time + ".csv", index=False)
-#df_test.to_csv("../../models/ODE-RNN/Résultats/Prédictions_test" + MODEL.__name__ + "_" + RE + Time + ".csv", index=False)
-
+df = res[0]['df']
+df_test = res[0]['df test']
 
 m_scores = scores.loc[:,metrics].mean()
 m_scores = m_scores.to_list()
@@ -259,5 +279,6 @@ m_scores = [RE, MODEL.__name__] + m_scores
 
 results = pd.DataFrame([m_scores], 
                        columns=['Random effect', 'Model', "MAE moyenne sur l'entrainement", "MSE moyenne sur l'entrainement", "MAE moyenne sur l'entrainement bruité", "MSE moyenne sur l'entrainement bruité", "MAE moyenne sur le test", "MSE moyenne sur le test", "MAE moyenne sur le test bruité", "MSE moyenne sur le test bruité"])
-
-results = results.to_json(path_or_buf="../../models/ODE-RNN/Résultats/"+ MODEL.__name__ + "_" + RE + Time + ".json")
+p = "../../models/ODE-RNN/Résultats/"+ MODEL.__name__ + "_" + RE + Time + ".json"
+p = os.path.join(os.path.dirname(__file__), p)
+results = results.to_json(path_or_buf= p)
