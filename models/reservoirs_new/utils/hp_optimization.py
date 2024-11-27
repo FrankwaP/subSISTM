@@ -40,60 +40,44 @@ from numpy import mean, array
 from numpy.typing import NDArray
 from optuna import Trial, create_study, samplers
 from optuna.logging import set_verbosity, DEBUG
-import optunahub
-
-from reservoirpy.nodes import ESN, Reservoir, Ridge  # type: ignore
-
 from reservoirpy.observables import mse  # type: ignore
 
 
-from .data import get_dataframe, prepare_data, remove_warmup_3D, FLOAT_DTYPE
-from .config import (
+from .reservoirs import get_esn_model_list, ESN
+from .data import get_dataframe, prepare_data, remove_warmup_3D
+from .global_config import (
     SERIES_COLUMN_NAME,
     TIMESTEPS_COLUMN_NAME,
-    N_CPUS,
-    N_SEEDS,
     N_WARMUPS,
-    JOBLIB_BACKEND,
     SCALER,
 )
 
 
 # optuna
-N_STARTUP_TRIALS = 50
-N_TPE_TRIALS = 50
+N_STARTUP_TRIALS = 0
+N_TPE_TRIALS = 400
 set_verbosity(DEBUG)
-
-mod = optunahub.load_module(
-    package="samplers/catcma",
-)
-CatCmaSampler = mod.CatCmaSampler
 
 
 # %%
+
+
 def _get_trial_model_list(trial: Trial) -> list[ESN]:
-    model_list = []
 
-    # if trial.number < N_STARTUP_TRIALS // 2:
-    #     max_units = 500
-    # else:
-    max_units = 3000
-
-    reservoir_dict = dict(
-        units=trial.suggest_int("N", 10, max_units),
+    reservoir_kwargs = dict(
+        units=trial.suggest_int("N", 50, 500),
         sr=trial.suggest_float("sr", 1e-4, 1e1, log=True),
         lr=trial.suggest_float("lr", 1e-4, 1e0, log=True),
         input_scaling=trial.suggest_float(
             "input_scaling", 1e-1, 1e1, log=True
         ),
-        dtype=FLOAT_DTYPE,
     )
 
-    ridge_dict = dict(
+    ridge_kwargs = dict(
         ridge=trial.suggest_float("ridge", 1e-8, 1e2, log=True),
     )
 
-    esn_dict = dict(
+    ens_kwargs = dict(
         use_raw_inputs=False,
         # use_raw_inputs=trial.suggest_categorical(
         #     "use_raw_inputs", [True, False]
@@ -102,20 +86,7 @@ def _get_trial_model_list(trial: Trial) -> list[ESN]:
         # feedback=trial.suggest_categorical("feedback", [True, False]),
     )
 
-    for reservoir_seed in range(42, 42 + N_SEEDS):
-        reservoir = Reservoir(**reservoir_dict, seed=reservoir_seed)
-        readout = Ridge(**ridge_dict)
-
-        model_list.append(
-            ESN(
-                reservoir=reservoir,
-                readout=readout,
-                workers=N_CPUS,
-                backend=JOBLIB_BACKEND,
-                **esn_dict,
-            )
-        )
-    return model_list
+    return get_esn_model_list(reservoir_kwargs, ridge_kwargs, ens_kwargs)
 
 
 def _optuna_objective(
@@ -124,7 +95,7 @@ def _optuna_objective(
     y_train_3D_scaled: NDArray,
     x_test_3D_scaled: NDArray,
     y_test_3D_scaled: NDArray,
-) -> (float, int):
+) -> tuple[float, int]:
     list_mse_scaled = []
 
     for model in _get_trial_model_list(trial):
@@ -215,12 +186,11 @@ def run_optimization(study_config: ModuleType) -> None:
         y_train_3D_scaled,
         x_test_3D_scaled,
         y_test_3D_scaled,
+
         _,
     ) = prepare_data(
         df_train=df_1,  # !!!
         df_test=df_2,  # !!!
-        serie_column_name=SERIES_COLUMN_NAME,
-        tstep_column_name=TIMESTEPS_COLUMN_NAME,
         x_labels=study_config.X_LABELS,
         y_labels=study_config.Y_LABELS,
         x_scaler=SCALER(),
@@ -249,12 +219,12 @@ def run_optimization(study_config: ModuleType) -> None:
         y_train_3D_scaled,
         x_test_3D_scaled,
         y_test_3D_scaled,
+
         _,
     ) = prepare_data(
         df_train=df_2,  # !!!
         df_test=df_1,  # !!!
-        serie_column_name=SERIES_COLUMN_NAME,
-        tstep_column_name=TIMESTEPS_COLUMN_NAME,
+
         x_labels=study_config.X_LABELS,
         y_labels=study_config.Y_LABELS,
         x_scaler=SCALER(),

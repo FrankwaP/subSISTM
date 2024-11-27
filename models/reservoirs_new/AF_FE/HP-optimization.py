@@ -4,7 +4,7 @@ from sys import path
 path.append("../")
 
 from utils.hp_optimization import run_optimization
-import config
+import study_config
 
 
-run_optimization(config)
+run_optimization(study_config)
