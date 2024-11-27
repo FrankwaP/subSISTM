@@ -11,7 +11,7 @@ library(ggplot2)
 set.seed(0)
 ## Définition des variables
 
-cl <- makeCluster(4)
+cl <- makeCluster(10)
 registerDoParallel(cl)
 
 ind <- 1:500
@@ -93,7 +93,7 @@ simul <- function(
 
 Dtest <- simul()
 
-boucle <- foreach(i=1:2, 
+boucle <- foreach(i=1:100, 
                   .combine=cbind, 
                   .packages=c("rockchalk", "dplyr", "lcmm", "doParallel", "foreach")) %dopar%
 {
@@ -201,6 +201,7 @@ boucle <- foreach(i=1:2,
            mae_train_naif_mixed_truth, mse_train_naif_mixed_truth, mae_test_naif_mixed_truth, mse_test_naif_mixed_truth,
            mae_train_mixed_obs, mse_train_mixed_obs, mae_test_mixed_obs, mse_test_mixed_obs,
            mae_train_naif_mixed_obs, mse_train_naif_mixed_obs, mae_test_naif_mixed_obs, mse_test_naif_mixed_obs,
+           mae_train_lin_mixed_truth, mse_train_lin_mixed_truth, mae_test_lin_mixed_truth, mse_test_lin_mixed_truth,
            mae_train_lin_mixed_obs, mse_train_lin_mixed_obs, mae_test_lin_mixed_obs, mse_test_lin_mixed_obs,
            mae_train_fixed_truth, mse_train_fixed_truth, mae_test_fixed_truth, mse_test_fixed_truth,
            mae_train_naif_fixed_truth, mse_train_naif_fixed_truth, mae_test_naif_fixed_truth, mse_test_naif_fixed_truth,
@@ -211,6 +212,7 @@ boucle <- foreach(i=1:2,
                      "mae_train_naif_mixed_truth", "mse_train_naif_mixed_truth", "mae_test_naif_mixed_truth", "mse_test_naif_mixed_truth",
                      "mae_train_mixed_obs", "mse_train_mixed_obs", "mae_test_mixed_obs", "mse_test_mixed_obs",
                      "mae_train_naif_mixed_obs", "mse_train_naif_mixed_obs", "mae_test_naif_mixed_obs", "mse_test_naif_mixed_obs",
+                     "mae_train_lin_mixed_truth", "mse_train_lin_mixed_truth", "mae_test_lin_mixed_truth", "mse_test_lin_mixed_truth",
                      "mae_train_lin_mixed_obs", "mse_train_lin_mixed_obs", "mae_test_lin_mixed_obs", "mse_test_lin_mixed_obs",
                      "mae_train_fixed_truth", "mse_train_fixed_truth", "mae_test_fixed_truth", "mse_test_fixed_truth",
                      "mae_train_naif_fixed_truth", "mse_train_naif_fixed_truth", "mae_test_naif_fixed_truth", "mse_test_naif_fixed_truth",
@@ -246,6 +248,8 @@ scores <- results[,c("mae_train_mixed_truth", "mse_train_mixed_truth", "mae_test
                      "mae_train_naif_mixed_truth", "mse_train_naif_mixed_truth", "mae_test_naif_mixed_truth", "mse_test_naif_mixed_truth",
                      "mae_train_mixed_obs", "mse_train_mixed_obs", "mae_test_mixed_obs", "mse_test_mixed_obs",
                      "mae_train_naif_mixed_obs", "mse_train_naif_mixed_obs", "mae_test_naif_mixed_obs", "mse_test_naif_mixed_obs",
+                     "mae_train_lin_mixed_truth", "mse_train_lin_mixed_truth", "mae_test_lin_mixed_truth", "mse_test_lin_mixed_truth",
+                     "mae_train_lin_mixed_obs", "mse_train_lin_mixed_obs", "mae_test_lin_mixed_obs", "mse_test_lin_mixed_obs",
                      "mae_train_fixed_truth", "mse_train_fixed_truth", "mae_test_fixed_truth", "mse_test_fixed_truth",
                      "mae_train_naif_fixed_truth", "mse_train_naif_fixed_truth", "mae_test_naif_fixed_truth", "mse_test_naif_fixed_truth",
                      "mae_train_fixed_obs", "mse_train_fixed_obs", "mae_test_fixed_obs", "mse_test_fixed_obs", "mse_test_fixed_obs",
