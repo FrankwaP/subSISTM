@@ -102,6 +102,7 @@ boucle <- foreach(i=1:100,
   #Modèle oracle sur les Y à effet mixed
   oracle_mixed <- hlme(y_mixed_obs ~ x2_x5 + x4_x7 + x6_x8,
                        random=~ x2_x5 + x4_x7 + x6_x8,
+                       idiag = TRUE,
                        data= Dtrain, subject='individus')
   save(oracle_mixed, file = paste("oracle_mix", k ,".rda", sep = ""))
   
@@ -127,6 +128,7 @@ boucle <- foreach(i=1:100,
   
   #Regression linéaire mixte avec toutes les variables pertinentes pour y_mixed
   naif_mixed <- hlme(y_mixed_obs ~ temps + temps**2 + temps**3 + temps**4,
+                     idiag = TRUE,
                      random=~ temps + temps**2 + temps**3 + temps**4,
                      data = Dtrain, subject='individus')
   
@@ -143,8 +145,9 @@ boucle <- foreach(i=1:100,
   mse_test_naif_mixed_obs <- mean((pred_test_naif_mixed$pred[,'pred_ss'] - Dtest$y_mixed_obs)^2)
   
   #regression linéaire mixe sur chaque variable sans interraction
-  lin_mixed <- hlme(y_mixed_obs ~ x2 + x4 + x5 + x6 + x7 + x8,
-                    random=~ x2 + x4 + x5 + x6 + x7,
+  lin_mixed <- hlme(y_mixed_obs ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
+                    idiag = TRUE,
+                    random=~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
                     data = Dtrain, subject='individus')
   
   pred_train_lin_mixed <- predictY(lin_mixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
@@ -181,20 +184,39 @@ boucle <- foreach(i=1:100,
   mae_test_fixed_obs <- mean(abs(pred_test_fixed - Dtest$y_fixed_obs))
   
   #Regression Linéaire avec toutes les variables pour y_fixed
-  naif_fixed <- lm(y_fixed_obs ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
-                   data = Dtrain)
+  naif_fixed <- hlme(y_fixed_obs ~ temps + temps**2 + temps**3 + temps**4,
+                        idiag = TRUE,
+                        random=~ temps + temps**2 + temps**3 + temps**4,
+                        data = Dtrain, subject='individus')
   
-  pred_train_naif_fixed <- predict(naif_fixed, newdata = Dtrain)
-  mae_train_naif_fixed_truth <- mean(abs(pred_train_naif_fixed - Dtrain$y_fixed))
-  mse_train_naif_fixed_truth <- mean((pred_train_naif_fixed - Dtrain$y_fixed)^2)
-  mae_train_naif_fixed_obs <- mean(abs(pred_train_naif_fixed - Dtrain$y_fixed_obs))
-  mse_train_naif_fixed_obs <- mean((pred_train_naif_fixed - Dtrain$y_fixed_obs)^2)
+  pred_train_naif_fixed <- predictY(naif_fixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_train_naif_fixed_truth <- mean(abs(pred_train_naif_fixed$pred[,'pred_ss'] - Dtrain$y_fixed))
+  mse_train_naif_fixed_truth <- mean((pred_train_naif_fixed$pred[,'pred_ss'] - Dtrain$y_fixed)^2)
+  mae_train_naif_fixed_obs <- mean(abs(pred_train_naif_fixed$pred[,'pred_ss'] - Dtrain$y_fixed_obs))
+  mse_train_naif_fixed_obs <- mean((pred_train_naif_fixed$pred[,'pred_ss'] - Dtrain$y_fixed_obs)^2)
   
-  pred_test_naif_fixed <- predict(naif_fixed, newdata = Dtest)
-  mae_test_naif_fixed_truth <- mean(abs(pred_test_naif_fixed - Dtest$y_fixed))
-  mse_test_naif_fixed_truth <- mean((pred_test_naif_fixed - Dtest$y_fixed)^2)
-  mae_test_naif_fixed_obs <- mean(abs(pred_test_naif_fixed - Dtest$y_fixed_obs))
-  mse_test_naif_fixed_obs <- mean((pred_test_naif_fixed - Dtest$y_fixed_obs)^2)
+  pred_test_naif_fixed <- predictY(naif_fixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_test_naif_fixed_truth <- mean(abs(pred_test_naif_fixed$pred[,'pred_ss'] - Dtest$y_fixed))
+  mse_test_naif_fixed_truth <- mean((pred_test_naif_fixed$pred[,'pred_ss'] - Dtest$y_fixed)^2)
+  mae_test_naif_fixed_obs <- mean(abs(pred_test_naif_fixed$pred[,'pred_ss'] - Dtest$y_fixed_obs))
+  mse_test_naif_fixed_obs <- mean((pred_test_naif_fixed$pred[,'pred_ss'] - Dtest$y_fixed_obs)^2)
+  
+  lin_fixed <- hlme(y_fixed_obs ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
+                    idiag = TRUE,
+                    random=~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
+                    data = Dtrain, subject='individus')
+  
+  pred_train_lin_fixed <- predictY(lin_fixed, newdata = Dtrain, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_train_lin_fixed_truth <- mean(abs(pred_train_lin_fixed$pred[,'pred_ss'] - Dtrain$y_fixed))
+  mse_train_lin_fixed_truth <- mean((pred_train_lin_fixed$pred[,'pred_ss'] - Dtrain$y_fixed)^2)
+  mae_train_lin_fixed_obs <- mean(abs(pred_train_lin_fixed$pred[,'pred_ss'] - Dtrain$y_fixed_obs))
+  mse_train_lin_fixed_obs <- mean((pred_train_lin_fixed$pred[,'pred_ss'] - Dtrain$y_fixed_obs)^2)
+  
+  pred_test_lin_fixed <- predictY(lin_fixed, newdata = Dtest, var.time = 'temps', marg = FALSE, subject = 'individus')
+  mae_test_lin_fixed_truth <- mean(abs(pred_test_lin_fixed$pred[,'pred_ss'] - Dtest$y_fixed))
+  mse_test_lin_fixed_truth <- mean((pred_test_lin_fixed$pred[,'pred_ss'] - Dtest$y_fixed)^2)
+  mae_test_lin_fixed_obs <- mean(abs(pred_test_lin_fixed$pred[,'pred_ss'] - Dtest$y_fixed_obs))
+  mse_test_lin_fixed_obs <- mean((pred_test_lin_fixed$pred[,'pred_ss'] - Dtest$y_fixed_obs)^2)
   
   #Aggregating results
   res <- c(mae_train_mixed_truth, mse_train_mixed_truth, mae_test_mixed_truth, mse_test_mixed_truth,
@@ -206,7 +228,9 @@ boucle <- foreach(i=1:100,
            mae_train_fixed_truth, mse_train_fixed_truth, mae_test_fixed_truth, mse_test_fixed_truth,
            mae_train_naif_fixed_truth, mse_train_naif_fixed_truth, mae_test_naif_fixed_truth, mse_test_naif_fixed_truth,
            mae_train_fixed_obs, mse_train_fixed_obs, mae_test_fixed_obs, mse_test_fixed_obs,
-           mae_train_naif_fixed_obs, mse_train_naif_fixed_obs, mae_test_naif_fixed_obs, mse_test_naif_fixed_obs)
+           mae_train_naif_fixed_obs, mse_train_naif_fixed_obs, mae_test_naif_fixed_obs, mse_test_naif_fixed_obs,
+           mae_train_lin_fixed_truth, mse_train_lin_fixed_truth, mae_test_lin_fixed_truth, mse_test_lin_fixed_truth,
+           mae_train_lin_fixed_obs, mse_train_lin_fixed_obs, mae_test_lin_fixed_obs, mse_test_lin_fixed_obs)
   res <- data.frame(res)
   rownames(res) <- c("mae_train_mixed_truth", "mse_train_mixed_truth", "mae_test_mixed_truth", "mse_test_mixed_truth",
                      "mae_train_naif_mixed_truth", "mse_train_naif_mixed_truth", "mae_test_naif_mixed_truth", "mse_test_naif_mixed_truth",
@@ -217,19 +241,23 @@ boucle <- foreach(i=1:100,
                      "mae_train_fixed_truth", "mse_train_fixed_truth", "mae_test_fixed_truth", "mse_test_fixed_truth",
                      "mae_train_naif_fixed_truth", "mse_train_naif_fixed_truth", "mae_test_naif_fixed_truth", "mse_test_naif_fixed_truth",
                      "mae_train_fixed_obs", "mse_train_fixed_obs", "mae_test_fixed_obs", "mse_test_fixed_obs",
-                     "mae_train_naif_fixed_obs", "mse_train_naif_fixed_obs", "mae_test_naif_fixed_obs", "mse_test_naif_fixed_obs")
+                     "mae_train_naif_fixed_obs", "mse_train_naif_fixed_obs", "mae_test_naif_fixed_obs", "mse_test_naif_fixed_obs",
+                     "mae_train_lin_fixed_truth", "mse_train_lin_fixed_truth", "mae_test_lin_fixed_truth", "mse_test_lin_fixed_truth",
+                     "mae_train_lin_fixed_obs", "mse_train_lin_fixed_obs", "mae_test_lin_fixed_obs", "mse_test_lin_fixed_obs")
   
   Dtrain[,"pred_mixed"] <- pred_train_mixed$pred[,'pred_ss']
   Dtrain[,"pred_fixed"] <- pred_train_fixed
   Dtrain[,"pred_naif_mixed"] <- pred_train_naif_mixed$pred[,'pred_ss']
   Dtrain[,"pred_naif_fixed"] <- pred_train_naif_fixed
   Dtrain[,"pred_lin_mixed"] <- pred_train_lin_mixed$pred[,'pred_ss']
+  Dtrain[,"pred_lin_fixed"] <- pred_train_lin_fixed$pred[,'pred_ss']
   
   Pred_test_k <- Dtest[,c("individus", "temps")]
   Pred_test_k[,paste("pred_mixed", k, sep="_")] <- pred_test_mixed$pred[,'pred_ss']
   Pred_test_k[,paste("pred_fixed", k, sep="_")] <- pred_test_fixed
   Pred_test_k[,paste("pred_naif_mixed", k, sep="_")] <- pred_test_naif_mixed$pred[,'pred_ss']
   Pred_test_k[,paste("pred_lin_mixed", k, sep="_")] <- pred_test_lin_mixed$pred[,'pred_ss']
+  Pred_test_k[,paste("pred_lin_fixed", k, sep="_")] <- pred_test_lin_fixed$pred[,'pred_ss']
   Pred_test_k[,paste("pred_naif_fixed", k, sep="_")] <- pred_test_naif_fixed
   
   #sortie
@@ -253,7 +281,9 @@ scores <- results[,c("mae_train_mixed_truth", "mse_train_mixed_truth", "mae_test
                      "mae_train_fixed_truth", "mse_train_fixed_truth", "mae_test_fixed_truth", "mse_test_fixed_truth",
                      "mae_train_naif_fixed_truth", "mse_train_naif_fixed_truth", "mae_test_naif_fixed_truth", "mse_test_naif_fixed_truth",
                      "mae_train_fixed_obs", "mse_train_fixed_obs", "mae_test_fixed_obs", "mse_test_fixed_obs", "mse_test_fixed_obs",
-                     "mae_train_naif_fixed_obs", "mse_train_naif_fixed_obs", "mae_test_naif_fixed_obs", "mse_test_naif_fixed_obs")]
+                     "mae_train_naif_fixed_obs", "mse_train_naif_fixed_obs", "mae_test_naif_fixed_obs", "mse_test_naif_fixed_obs",
+                     "mae_train_lin_fixed_truth", "mse_train_lin_fixed_truth", "mae_test_lin_fixed_truth", "mse_test_lin_fixed_truth",
+                     "mae_train_lin_fixed_obs", "mse_train_lin_fixed_obs", "mae_test_lin_fixed_obs", "mse_test_lin_fixed_obs")]
 scores_moy <- colMeans(scores)                          
 scores_moy <- as.data.frame(t(scores_moy))
 
