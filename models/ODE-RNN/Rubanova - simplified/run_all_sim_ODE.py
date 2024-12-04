@@ -24,6 +24,7 @@ from ode_func import ODEFunc
 from diffeq_solver import DiffeqSolver
 from joblib import Parallel, delayed
 import os
+
 #Seeding
 np.random.seed(0)
 torch.manual_seed(0)
@@ -36,7 +37,7 @@ RE = 'Mixed' if USE_MIXED_EFFECT else 'Fixed'
 Time = 'Random time' if RANDOM_TIME else 'Regular time'
 #Device and pathing
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-CSV_Dtest = "../../../data/synthetic_bph_1/Simulations random time/01_test.csv"
+CSV_Dtest = "../../../data/synthetic_bph_1/Simulations/01_test.csv"
 CSV_Dtest = os.path.join(os.path.dirname(__file__), CSV_Dtest)
 dtest = pd.read_csv(CSV_Dtest, sep=";", decimal=",")
 
@@ -57,7 +58,7 @@ test_dict={}
 #fuunction for looping over 
 def ODE_GRU_process(n_set = 1):
     print("n_set:", n_set)
-    CSV_FILE = "../../../data/synthetic_bph_1/Simulations random time/simulation" + str(n_set) + ".csv"
+    CSV_FILE = "../../../data/synthetic_bph_1/Simulations/simulation" + str(n_set) + ".csv"
     CSV_FILE = os.path.join(os.path.dirname(__file__), CSV_FILE)
     data = pd.read_csv(CSV_FILE, sep=";", decimal=",")
     #Variables used
@@ -181,9 +182,8 @@ def ODE_GRU_process(n_set = 1):
     loss_train = []
     cur_loss_val = 0
     nb_epochs = 0
-    min_loss = float('inf')
     criterion = nn.MSELoss()
-    while abs(np.max(loss_val[-100:] - np.min(loss_val[-100:] + [cur_loss_val]))) >= eps and nb_epochs < niters:
+    while abs(np.max(loss_val[-100:] - np.min(loss_val[-100:] + [cur_loss_val]))) >= eps and loss_val[-100] > cur_loss_val and nb_epochs < niters:
         optimizer.zero_grad()
         utils.update_learning_rate(optimizer, decay_rate = 0.999, lowest = lr / 10)
         train_res = model.compute_all_losses(train_dict, n_traj_samples = 100)
@@ -273,9 +273,15 @@ def ODE_GRU_process(n_set = 1):
         MSE_list_test_obs.append(MSE(pred_k,target_k_obs))
 
     #Saving the model
-    p = "../../../models/ODE-RNN/Résultats/Parameters/POIDS_ODE RNN_" + RE + Time + "_" + str(n_set)
-    p = os.path.join(os.path.dirname(__file__), p)
-    torch.save(model.state_dict(), p)
+    if n_set == 1:
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.plot(loss_train, label ="loss")
+        plt.plot(loss_val, label = "validation")
+        plt.legend()
+        p = "../../models/ODE-RNN/Résultats/Graphs/Loss_ODE-GRU_" + RE +".png"
+        p = os.path.join(os.path.dirname(__file__), p)
+        plt.savefig(p)
 
 
     #On met tous les résultats dans un dictionnaire
@@ -297,7 +303,7 @@ def ODE_GRU_process(n_set = 1):
         df_test.to_csv(p + "Prédictions_test_ODE RNN_" + RE + Time + ".csv", index=False)
     return (res_loop)
 
-res = Parallel(n_jobs=4)(delayed(ODE_GRU_process)(n_set = i) for i in range(1,21))
+res = Parallel(n_jobs=6)(delayed(ODE_GRU_process)(n_set = i) for i in range(1,101))
 
 metrics =  ['MAE train', 'MSE train', 'MAE train obs', 'MSE train obs', 'MAE test', 'MSE test', 'MAE test obs', 'MSE test obs']
 scores = [{k:x[k] for k in metrics} for x in res]

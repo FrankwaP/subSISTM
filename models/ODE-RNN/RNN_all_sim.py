@@ -65,8 +65,8 @@ def rnn_train_test(n_set):
 
     res_loop = {}
 
-    CSV_FILE = "../../data/synthetic_bph_1/Simulations " + Time + "/simulation" + str(n_set) + ".csv"
-    CSV_Dtest = "../../data/synthetic_bph_1/Simulations " + Time + "/01_test.csv"
+    CSV_FILE = "../../data/synthetic_bph_1/Simulations" + "/simulation" + str(n_set) + ".csv"
+    CSV_Dtest = "../../data/synthetic_bph_1/Simulations" + "/01_test.csv"
     CSV_RES_R = "../../data/synthetic_bph_1/Résultats " + Time
     CSV_FILE = os.path.join(os.path.dirname(__file__), CSV_FILE)
     CSV_Dtest = os.path.join(os.path.dirname(__file__), CSV_Dtest)
@@ -152,8 +152,7 @@ def rnn_train_test(n_set):
     loss_train = []
     cur_loss_val = 0
     nb_epochs = 0
-    min_loss = float('inf')
-    while abs(np.max(loss_val[-100:] - np.min(loss_val[-100:] + [cur_loss_val]))) >= eps and nb_epochs < epoch:
+    while abs(np.max(loss_val[-100:] - np.min(loss_val[-100:] + [cur_loss_val]))) >= eps and loss_val[-100] > cur_loss_val and nb_epochs < epoch:
 
         y_val = model(input = input_val)
         cur_loss_val = criterion(y_val, target_val).item()
@@ -169,8 +168,6 @@ def rnn_train_test(n_set):
         loss_train.append(cur_loss_train)
         
         nb_epochs += 1
-    if cur_loss_val < min_loss:
-        min_loss = cur_loss_val
 
     loss_val = loss_val[101:]
     if n_set == 1:
