@@ -1,13 +1,22 @@
 # -*- coding: utf-8 -*-
 
 from sys import path
+from pathlib import Path
 from subprocess import call
+from joblib import dump
 
 from numpy import mean
+from numpy.random import seed
 from numpy.typing import NDArray
 from pandas import read_csv, DataFrame
 from sklearn.neural_network import MLPRegressor
+from sklearn.metrics import (
+    mean_absolute_error as mae,
+    mean_squared_error as mse,
+)
 
+
+seed(42)
 path.append("../reservoirs-synthetic_bph/")
 
 from utils.data import get_dataframe
@@ -24,12 +33,10 @@ Y_LABEL_FE = Y_LABEL + "_fixed"  # the value are not fixed
 
 
 def iterate_mixedml(
-    ml_fixed: MLPRegressor,
-    df_data: DataFrame,
-    lr: float,
+    ml_fixed: MLPRegressor, df_data: DataFrame
 ) -> tuple[MLPRegressor, DataFrame, bool]:
 
-    ####
+    #### fitting the Machine Learning model
     X = df_data[X_LABELS]
     y = df_data[Y_LABEL_FE]
     # we train ml_fixed by ignoring cluster effects (with the target y)
@@ -40,57 +47,77 @@ def iterate_mixedml(
     except AttributeError:
         y_fixed = ml_fixed.run(X)
 
-    ####
+    #### fitting the Mixed Effect model
     # based on e_fixed
-    df_data["e_fixed"] = y - y_fixed
+    # !!! l'erreur était là (j'utilisais "y- y_fixed")
+    df_data["e_fixed"] = df_data[Y_LABEL] - y_fixed
     df_data.to_csv("ml_pred.csv", index=False)
     # we estimate u
     call(["Rscript", "random_effects_fitting.R"])
     random_preds = read_csv("random_preds.csv")
-    random_pred_ss = random_preds["pred_ss"].to_numpy()
+    y_random = random_preds["pred_ss"].to_numpy()
 
     # then we upgrade y_fixed = y-Zu
     # … and re-train ml_fixed with the updated target variable y_fixed
-    df_data[Y_LABEL_FE] = df_data[Y_LABEL] - lr * random_pred_ss
+    df_data[Y_LABEL_FE] = df_data[Y_LABEL] - y_random
 
-    return ml_fixed, df_data, msr(random_preds["resid_ss"])
+    ####
+    # final prediction to monitor convergence
+    y_pred = y_fixed + y_random
 
+    # check that it's equivalent
+    # assert (
+    #     abs(
+    #         mse(df_data[Y_LABEL], y_pred) - mean(random_preds["resid_ss"] ** 2)
+    #     )
+    #     < 1e-6
+    # )
 
-def mar(resid: NDArray) -> float:
-    return mean(abs(resid))
-
-
-def msr(resid: NDArray) -> float:
-    return mean(resid**2)
+    return ml_fixed, df_data, mse(df_data[Y_LABEL], y_pred)
 
 
 def loop_mixedml(
     ml_fixed: MLPRegressor,
     df_data: DataFrame,
-    eps: float,
-    lr: float,
+    *,
+    n_iter_improve: int,
     max_iter: int,
 ):
     # initialization
     istep = 0
-    converged = False
     df_data[Y_LABEL_FE] = df_data[Y_LABEL]
     # iteration
-    resid_list = []
-    while not converged and istep < max_iter:
-        ml_fixed, df_data, resid = iterate_mixedml(ml_fixed, df_data, lr)
-        # print(resid)
-        converged = resid < eps
+    metric_list = []
+    best_metric = None
+    for istep in range(max_iter):
+        ml_fixed, df_data, metric = iterate_mixedml(ml_fixed, df_data)
+        print(f"mixedML step #{istep:02d}: {metric:8e}", end="")
+        #
+        if best_metric is None or metric < best_metric:
+            print(" (best)")
+            best_metric = metric
+            n_it_no_improve = 0
+            ml_fixed_bak = ml_fixed
+            Path("random_hlme.Rds").rename("best_random_hlme.Rds")
+        else:
+            print("")
+            n_it_no_improve += 1
+            if n_it_no_improve > n_iter_improve:
+                break
+
+        metric_list.append(metric)
         istep += 1
-        resid_list.append(resid)
-        print(f"mixedML step #{istep:02d}: {resid:8e}")
-    return resid_list
+
+    dump(ml_fixed_bak, "best_fixed_ml.joblib")
+    Path("random_hlme.Rds").unlink()
+
+    return metric_list
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     data = get_dataframe("../../data/synthetic_bph_1/01_test.csv")
-#     data = data[data["individus"] <= 10]
+    data = get_dataframe("../../data/synthetic_bph_1/01_test.csv")
+    data = data[data["individus"] <= 10]
 
-#     model = MLPRegressor(hidden_layer_sizes=(20, 20, 20), max_iter=2000)
-#     loop_mixedml(model, data, 1e-1, lr=1e-2, max_iter=1000)
+    model = MLPRegressor(hidden_layer_sizes=(20, 20, 20), max_iter=2000)
+    loop_mixedml(model, data, n_iter_improve=10, max_iter=1000)

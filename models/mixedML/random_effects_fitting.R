@@ -8,6 +8,7 @@ data$individus <- as.numeric(data$individus)
 random_hlme <- hlme(
   e_fixed ~ 1,
   random = ~  x2_x5 + x4_x7 + x6_x8,
+  # cor = AR(temps) ou BM(temps)
   idiag = TRUE,
   data = data,
   subject = 'individus',
@@ -20,3 +21,5 @@ write.table(
   dec = ".",
   row.names = FALSE
 )
+
+saveRDS(random_hlme, 'random_hlme.Rds')
