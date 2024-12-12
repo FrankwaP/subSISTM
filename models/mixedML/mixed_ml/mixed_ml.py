@@ -2,19 +2,14 @@
 from pathlib import Path
 from subprocess import check_call
 from copy import deepcopy
+from typing import Optional
 
-from joblib import dump, load  # type: ignore
+from joblib import dump  # type: ignore
 from numpy import array
 from numpy.typing import NDArray
 from pandas import DataFrame, read_csv
-from reservoirpy.nodes import ESN
+from reservoirpy.nodes import ESN  # type: ignore
 from sklearn.metrics import mean_squared_error as mse  # type: ignore
-
-# this is to avoid doing it in other scripts/notebooks
-from sys import path
-
-path.append("../reservoirs-synthetic_bph/")
-from utils.data import get_dataframe
 
 
 # !!! please set similar values in the R scripts
@@ -69,15 +64,11 @@ class _FixedEffectsEstimator:
         assert len(meth_name) == 1
         self._model_predict = getattr(self.model, meth_name[0])
 
-    def fit(self, X: NDArray, y: NDArray) -> None:
-        self.model.fit(X, y)
+    def fit(self, X: NDArray, y: NDArray, options: dict) -> None:
+        self.model.fit(X, y, **options)
 
     def predict(self, X: NDArray) -> NDArray:
         return self._model_predict(X)
-
-    def fit_and_predict(self, X: NDArray, y: NDArray) -> NDArray:
-        self.fit(X, y)
-        return self.predict(X)
 
 
 class _RecurrentFixedEffectsEstimator(_FixedEffectsEstimator):
@@ -108,8 +99,8 @@ class _RecurrentFixedEffectsEstimator(_FixedEffectsEstimator):
         self.n_series, self.n_tsteps = None, None
         return y
 
-    def fit(self, X: NDArray, y: NDArray) -> None:
-        super().fit(self.trans_input(X), self.trans_input(y))
+    def fit(self, X: NDArray, y: NDArray, options: dict) -> None:
+        super().fit(self.trans_input(X), self.trans_input(y), options)
 
     def predict(self, X: NDArray) -> NDArray:
         return self.trans_y_output(super().predict(self.trans_input(X)))
@@ -118,9 +109,11 @@ class _RecurrentFixedEffectsEstimator(_FixedEffectsEstimator):
 class _RandomEffectsEstimator:
 
     def fit_and_predict(self) -> NDArray:
+        # !!! prediction is done on R_CSV_FIT (train)
         return self._call_and_read(R_FIT, R_CSV_FIT)
 
     def predict(self) -> NDArray:
+        # !!! prediction is done on R_CSV_PRED (val)
         return self._call_and_read(R_PREDICT, R_CSV_PRED)
 
     @staticmethod
@@ -140,16 +133,18 @@ class MixedMLEstimator:
         recurrent_model: bool,
     ):
         assert isinstance(recurrent_model, bool)
-        if recurrent_model:
-            model_class = _RecurrentFixedEffectsEstimator
-        else:
+        if not recurrent_model:  # in this order for mypy
             model_class = _FixedEffectsEstimator
+        else:
+            model_class = _RecurrentFixedEffectsEstimator
 
         self.ml_fixed = model_class(fixed_effect_estimator)
         # self.lcmm = random_effects_estimator
         self.lcmm = _RandomEffectsEstimator()
 
-    def fit_iteration(self, df: DataFrame) -> tuple[DataFrame, float]:
+    def fit_iteration(
+        self, df: DataFrame, fixed_model_option: dict
+    ) -> tuple[DataFrame, float]:
         #### fitting the Machine Learning model
         X = df[X_LABELS].to_numpy()
         y = df[Y_LABEL_FE].to_numpy()
@@ -157,7 +152,8 @@ class MixedMLEstimator:
         # to get an estimate of y_fixed
         if isinstance(self.ml_fixed, _RecurrentFixedEffectsEstimator):
             self.ml_fixed.prepare(df)
-        y_fixed = self.ml_fixed.fit_and_predict(X, y)
+        self.ml_fixed.fit(X, y, fixed_model_option)
+        y_fixed = self.ml_fixed.predict(X)
 
         #### fitting the Random Effect model
         # based on e_fixed
@@ -184,8 +180,12 @@ class MixedMLEstimator:
         df_data: DataFrame,
         *,
         n_iter_improve: int,
-        max_iter: int,
+        min_ratio_improve: float,
+        fixed_model_options: Optional[dict] = None,
     ) -> list[float]:
+        assert 0 <= min_ratio_improve < 1
+        if fixed_model_options is None:
+            fixed_model_options = {}
         # initialization
         istep = 0
         df = df_data.copy()  # we are going to modify it for fitting
@@ -193,11 +193,14 @@ class MixedMLEstimator:
         # iteration
         metric_list = []
         best_metric = None
-        for istep in range(max_iter):
-            df, metric = self.fit_iteration(df)
+        while True:
+            df, metric = self.fit_iteration(df, fixed_model_options)
             print(f"mixedML step #{istep:02d}: {metric:8e}", end="")
             #
-            if best_metric is None or metric < best_metric:
+            if (
+                best_metric is None
+                or metric < (1 - min_ratio_improve) * best_metric
+            ):
                 print(" (best)")
                 best_metric = metric
                 n_it_no_improve = 0
