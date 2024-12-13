@@ -15,7 +15,7 @@ from .global_config import SERIES_COLUMN_NAME, TIMESTEPS_COLUMN_NAME
 set_seed(42)
 verbosity(0)
 
-FLOAT_DTYPE = float32
+FLOAT_DTYPE = 'float32'
 
 DTYPES = {
     "x1": FLOAT_DTYPE,
@@ -35,7 +35,7 @@ DTYPES = {
     "x2_x5": FLOAT_DTYPE,
     "x4_x7": FLOAT_DTYPE,
     "x6_x8": FLOAT_DTYPE,
-    "x8": str,
+    "x8": 'category',
     "y_mixed": FLOAT_DTYPE,
     "y_mixed_obs": FLOAT_DTYPE,
     "y_fixed": FLOAT_DTYPE,

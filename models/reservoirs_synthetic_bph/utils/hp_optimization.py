@@ -46,16 +46,14 @@ from reservoirpy.observables import mse  # type: ignore
 from .reservoirs import get_esn_model_list, ESN
 from .data import get_dataframe, prepare_data, remove_warmup_3D
 from .global_config import (
-    SERIES_COLUMN_NAME,
-    TIMESTEPS_COLUMN_NAME,
     N_WARMUPS,
     SCALER,
 )
 
 
 # optuna
-N_STARTUP_TRIALS = 0
-N_TPE_TRIALS = 400
+N_STARTUP_TRIALS = 100
+N_TPE_TRIALS = 100
 set_verbosity(DEBUG)
 
 
@@ -186,7 +184,6 @@ def run_optimization(study_config: ModuleType) -> None:
         y_train_3D_scaled,
         x_test_3D_scaled,
         y_test_3D_scaled,
-
         _,
     ) = prepare_data(
         df_train=df_1,  # !!!
@@ -219,12 +216,10 @@ def run_optimization(study_config: ModuleType) -> None:
         y_train_3D_scaled,
         x_test_3D_scaled,
         y_test_3D_scaled,
-
         _,
     ) = prepare_data(
         df_train=df_2,  # !!!
         df_test=df_1,  # !!!
-
         x_labels=study_config.X_LABELS,
         y_labels=study_config.Y_LABELS,
         x_scaler=SCALER(),
