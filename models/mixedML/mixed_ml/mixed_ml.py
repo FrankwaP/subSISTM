@@ -38,7 +38,7 @@ R_CSV_PRED = RSLT_DIR + "/random_effect_predict.csv"
 
 SERIES = "individus"
 TSTEPS = "temps"
-X_LABELS = ["x2_x5", "x4_x7", "x6_x8"]
+X_LABELS = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"]
 Y_LABEL = "y_mixed_obs"  # the values are fixed
 
 # the paper says "y_fixed" for "y fixed effects"
