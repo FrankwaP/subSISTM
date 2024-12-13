@@ -36,7 +36,7 @@ Training/prediction steps:
 """
 from types import ModuleType
 
-from numpy import mean, array
+from numpy import mean, array, isnan
 from numpy.typing import NDArray
 from optuna import Trial, create_study, samplers
 from optuna.logging import set_verbosity, DEBUG
@@ -53,7 +53,7 @@ from .global_config import (
 
 # optuna
 N_STARTUP_TRIALS = 100
-N_TPE_TRIALS = 100
+N_TPE_TRIALS = 50
 set_verbosity(DEBUG)
 
 
@@ -87,6 +87,45 @@ def _get_trial_model_list(trial: Trial) -> list[ESN]:
     return get_esn_model_list(reservoir_kwargs, ridge_kwargs, ens_kwargs)
 
 
+def check_if_use_yprey(
+    x_train_3D_scaled: NDArray,
+    x_test_3D_scaled: NDArray,
+) -> bool:
+
+    train_tmp = x_train_3D_scaled[:, 0, :]
+    test_tmp = x_test_3D_scaled[:, 0, :]
+
+    shp = train_tmp.shape[1]
+
+    for i in range(shp):
+        if isnan(train_tmp[0, i]):
+            assert all(isnan(train_tmp[:, i]))
+            assert all(isnan(test_tmp[:, i]))
+            return True
+
+
+def adpapt_tensors_if_ypred(
+    x_train_3D_scaled: NDArray,
+    y_train_3D_scaled: NDArray,
+    x_test_3D_scaled: NDArray,
+    y_test_3D_scaled: NDArray,
+    n_warmups: int,
+) -> tuple[NDArray, NDArray, NDArray, NDArray, int]:
+    if check_if_use_yprey(x_train_3D_scaled, x_test_3D_scaled):
+        n_warmups -= 1
+        x_train_3D_scaled = x_train_3D_scaled[:, 1:, :]
+        y_train_3D_scaled = y_train_3D_scaled[:, 1:, :]
+        x_test_3D_scaled = x_test_3D_scaled[:, 1:, :]
+        y_test_3D_scaled = y_test_3D_scaled[:, 1:, :]
+    return (
+        x_train_3D_scaled,
+        y_train_3D_scaled,
+        x_test_3D_scaled,
+        y_test_3D_scaled,
+        n_warmups,
+    )
+
+
 def _optuna_objective(
     trial: Trial,
     x_train_3D_scaled: NDArray,
@@ -95,9 +134,24 @@ def _optuna_objective(
     y_test_3D_scaled: NDArray,
 ) -> tuple[float, int]:
     list_mse_scaled = []
+    n_warmups = N_WARMUPS
+
+    (
+        x_train_3D_scaled,
+        y_train_3D_scaled,
+        x_test_3D_scaled,
+        y_test_3D_scaled,
+        n_warmups,
+    ) = adpapt_tensors_if_ypred(
+        x_train_3D_scaled,
+        y_train_3D_scaled,
+        x_test_3D_scaled,
+        y_test_3D_scaled,
+        n_warmups,
+    )
 
     for model in _get_trial_model_list(trial):
-        model.fit(x_train_3D_scaled, y_train_3D_scaled, warmup=N_WARMUPS)
+        model.fit(x_train_3D_scaled, y_train_3D_scaled, warmup=n_warmups)
 
         y_pred_3D_scaled = model.run(x_test_3D_scaled)
         if isinstance(y_pred_3D_scaled, list):
@@ -105,8 +159,8 @@ def _optuna_objective(
 
         list_mse_scaled.append(
             mse(
-                remove_warmup_3D(y_pred_3D_scaled, N_WARMUPS),
-                remove_warmup_3D(y_test_3D_scaled, N_WARMUPS),
+                remove_warmup_3D(y_pred_3D_scaled, n_warmups),
+                remove_warmup_3D(y_test_3D_scaled, n_warmups),
             )
         )
     return mean(list_mse_scaled), trial.params["N"]

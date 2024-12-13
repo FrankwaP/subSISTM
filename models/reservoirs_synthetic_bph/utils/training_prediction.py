@@ -15,6 +15,7 @@ from sklearn.metrics import (  # type:ignore
 
 from .data import get_dataframe, prepare_data
 from .reservoirs import get_esn_model_list, ESN
+from .hp_optimization import adpapt_tensors_if_ypred
 from .global_config import (
     SERIES_COLUMN_NAME,
     TIMESTEPS_COLUMN_NAME,
@@ -59,10 +60,24 @@ def _train_pred_simu(
     inverse_transform_y_pred_3D_scaled: Callable,
 ) -> DataFrame:
 
-    simu_df = DataFrame()
+    n_warmups = N_WARMUPS
 
+    (
+        x_train_3D_scaled,
+        y_train_3D_scaled,
+        x_test_3D_scaled,
+        y_test_3D_scaled,
+        n_warmups,
+    ) = adpapt_tensors_if_ypred(
+        x_train_3D_scaled,
+        y_train_3D_scaled,
+        x_test_3D_scaled,
+        n_warmups,
+    )
+
+    simu_df = DataFrame()
     for iseed, model in enumerate(model_list):
-        model.fit(x_train_3D_scaled, y_train_3D_scaled, warmup=N_WARMUPS)
+        model.fit(x_train_3D_scaled, y_train_3D_scaled, warmup=n_warmups)
         y_pred_3D_scaled = model.run(x_test_3D_scaled)
         if isinstance(y_pred_3D_scaled, list):
             y_pred_3D_scaled = array(y_pred_3D_scaled)
