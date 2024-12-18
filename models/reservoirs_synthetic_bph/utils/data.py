@@ -1,21 +1,20 @@
-from typing import NamedTuple, Callable, Union
+from typing import Callable, Union
 from pathlib import Path
 
 from numpy.typing import NDArray
-from numpy import float32
 from pandas import read_csv, DataFrame
 
-from reservoirpy import set_seed, verbosity  # type: ignore
+
 from sklearn.base import TransformerMixin  # type: ignore
 from sklearn.utils.validation import check_is_fitted  # type: ignore
 from sklearn.exceptions import NotFittedError  # type: ignore
 
-from .global_config import SERIES_COLUMN_NAME, TIMESTEPS_COLUMN_NAME
+from .global_config import (
+    SERIES_COLUMN_NAME,
+    TIMESTEPS_COLUMN_NAME,
+    FLOAT_DTYPE,
+)
 
-set_seed(42)
-verbosity(0)
-
-FLOAT_DTYPE = "float32"
 
 DTYPES = {
     "x1": FLOAT_DTYPE,
@@ -67,14 +66,6 @@ def _check_fitted(scaler: TransformerMixin) -> bool:
     return True
 
 
-class _Data(NamedTuple):
-    x_train_3D_scaled: NDArray
-    y_train_3D_scaled: NDArray
-    x_test_3D_scaled: NDArray
-    y_test_3D_scaled: NDArray  # for optuna val MSE
-    inverse_transform_pred: Callable  # for final (real) MSE
-
-
 def prepare_data(
     *,
     df_train: DataFrame,
@@ -83,12 +74,23 @@ def prepare_data(
     y_labels: list[str],
     x_scaler: TransformerMixin,
     y_scaler: TransformerMixin,
-) -> _Data:
+) -> tuple[NDArray, NDArray, NDArray, NDArray, Callable, Callable, float]:
 
     Nx = len(x_labels)
     Ny = len(y_labels)
     sort_columns = [SERIES_COLUMN_NAME, TIMESTEPS_COLUMN_NAME]
 
+    ####
+    # case where we use y(t-1) in the covariates, and we have NaN for the first timestep
+    tsteps_train0 = df_train[TIMESTEPS_COLUMN_NAME].unique()
+    df_train.dropna(inplace=True)
+    df_test.dropna(inplace=True)
+    tsteps_train = df_train[TIMESTEPS_COLUMN_NAME].unique()
+    tsteps_test = df_test[TIMESTEPS_COLUMN_NAME].unique()
+    assert (tsteps_train == tsteps_test).all()
+    n_warmups_offset = len(tsteps_train) - len(tsteps_train0)
+    ####
+    #
     df_train.sort_values(sort_columns, inplace=True)
     Ns_train = len(df_train[SERIES_COLUMN_NAME].unique())
     Nt_train = len(df_train[TIMESTEPS_COLUMN_NAME].unique())
@@ -99,7 +101,7 @@ def prepare_data(
         (Ns_train, Nt_train, Ny)
     )
     print(f"Train set is {Ns_train} individuals")
-
+    #
     df_test.sort_values(sort_columns, inplace=True)
     Ns_test = len(df_test[SERIES_COLUMN_NAME].unique())
     Nt_test = len(df_test[TIMESTEPS_COLUMN_NAME].unique())
@@ -111,19 +113,35 @@ def prepare_data(
     )
     print(f"Train set is {Ns_test} individuals")
 
-    def inverse_transform_y_pred_3D_scaled(
-        y_pred_3D_scaled: NDArray,
+    def _inverse_transform_y_pred_3D_scaled(
+        y_pred_3D_scaled: NDArray, df_format: DataFrame, Ns: int, Nt: int
     ) -> DataFrame:
-        df = df_test[[SERIES_COLUMN_NAME, TIMESTEPS_COLUMN_NAME]].copy()
+        df = df_format[[SERIES_COLUMN_NAME, TIMESTEPS_COLUMN_NAME]].copy()
         df["pred"] = y_scaler.inverse_transform(
-            y_pred_3D_scaled.reshape((Ns_test * Nt_test, Ny))
+            y_pred_3D_scaled.reshape((Ns * Nt, Ny))
         )
         return df
 
-    return _Data(
+    def inverse_transform_y_test_3D_scaled(
+        y_pred_3D_scaled: NDArray,
+    ) -> DataFrame:
+        return _inverse_transform_y_pred_3D_scaled(
+            y_pred_3D_scaled, df_test, Ns_test, Nt_test
+        )
+
+    def inverse_transform_y_train_3D_scaled(
+        y_pred_3D_scaled: NDArray,
+    ) -> DataFrame:
+        return _inverse_transform_y_pred_3D_scaled(
+            y_pred_3D_scaled, df_train, Ns_train, Nt_train
+        )
+
+    return (
         x_train_3D_scaled,
         y_train_3D_scaled,
         x_test_3D_scaled,
         y_test_3D_scaled,
-        inverse_transform_y_pred_3D_scaled,
+        inverse_transform_y_test_3D_scaled,
+        inverse_transform_y_train_3D_scaled,
+        n_warmups_offset,
     )

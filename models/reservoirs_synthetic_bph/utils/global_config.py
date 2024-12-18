@@ -15,6 +15,12 @@ SIMU_PATTERN = "simulation*.csv"
 SERIES_COLUMN_NAME = "individus"
 TIMESTEPS_COLUMN_NAME = "temps"
 SCALER = RobustScaler
+
+set_seed(42)
+verbosity(0)
+
+FLOAT_DTYPE = "float32"
+
 # reservoirpy
 N_WARMUPS = 5
 N_SEEDS = 5

@@ -34,28 +34,23 @@ Training/prediction steps:
         MAE/MSE on test
 
 """
-from os import chdir, makedirs
 from sys import path
 
 path.append("..")
 
-from multiprocessing import Pool, current_process
-from itertools import repeat
 
 from numpy import mean
-from numpy.typing import NDArray
 from pandas import DataFrame
 from optuna import Trial, create_study, samplers
 from optuna.logging import set_verbosity, DEBUG
 
-from reservoirpy.nodes import Reservoir, Ridge  # type: ignore
 from reservoirpy.observables import mse  # type: ignore
 
 
+from .trial_model_multiprocessing import multi_proc_fit_and_predict_trial
 from .data import get_dataframe, remove_warmup_1D
-from .global_config import N_WARMUPS, SCALER, N_SEEDS
+from .global_config import N_WARMUPS, SCALER
 from mixed_ml.mixed_ml import (
-    MixedMLEstimator,
     SERIES,
     TSTEPS,
     X_LABELS,
@@ -72,48 +67,12 @@ set_verbosity(DEBUG)
 # %%
 
 
-def _get_trial_model_list(trial: Trial) -> list[MixedMLEstimator]:
-    list_model = []
-
-    reservoir_dict = dict(
-        units=trial.suggest_int("N", 10, 200),
-        sr=trial.suggest_float("sr", 1e-4, 1e1, log=True),
-        lr=trial.suggest_float("lr", 1e-4, 1e0, log=True),
-        input_scaling=trial.suggest_float(
-            "input_scaling", 1e-1, 1e1, log=True
-        ),
-    )
-    ridge_dict = dict(
-        ridge=trial.suggest_float("ridge", 1e-8, 1e2, log=True),
-    )
-
-    for seed in range(42, 42 + N_SEEDS):
-        reservoir = Reservoir(**reservoir_dict, seed=seed)
-        ridge = Ridge(**ridge_dict)
-        esn = reservoir >> ridge
-        list_model.append(MixedMLEstimator(esn, recurrent_model=True))
-    return list_model
-
-
-def _mp_fit(
-    model: MixedMLEstimator, options_fit: dict, options_pred: dict
-) -> NDArray:
-    name = current_process().name
-    makedirs(name + "/results", exist_ok=True)
-    chdir(name)
-    model.fit(**options_fit)
-    return model.predict(**options_pred)
-
-
 def _optuna_objective(
     trial: Trial,
     df_train_scaled: DataFrame,
     df_val_scaled: DataFrame,
 ) -> tuple[float, int]:
-    list_y_pred_3D_scaled = []
 
-    ### maybe one day (confusion with the csv files shared with R: one for N process)
-    model_list = _get_trial_model_list(trial)
     options_fit = dict(
         df_data=df_train_scaled,
         n_iter_improve=1,
@@ -124,13 +83,12 @@ def _optuna_objective(
         df_data=df_val_scaled,
         use_subject_specific=True,
     )
-    with Pool(N_SEEDS) as p:
-        list_y_pred_3D_scaled = p.starmap(
-            _mp_fit, zip(model_list, repeat(options_fit), repeat(option_pred))
-        )
-    #################
+    list_y_pred_3D_scaled = multi_proc_fit_and_predict_trial(
+        trial, options_fit, option_pred
+    )
 
     #################
+    # old way: no multiprocessing
     # for model in _get_trial_model_list(trial):
     #     model.fit(
     #         df_train_scaled,

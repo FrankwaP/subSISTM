@@ -8,14 +8,11 @@ from numpy.typing import NDArray
 from numpy import array
 from pandas import DataFrame, concat
 
-from sklearn.metrics import (  # type:ignore
-    mean_squared_error as mse,  # type:ignore
-    mean_absolute_error as mae,  # type:ignore
-)  # type:ignore
 
 from .data import get_dataframe, prepare_data
 from .reservoirs import get_esn_model_list, ESN
-from .hp_optimization import adpapt_tensors_if_ypred
+
+# from .hp_optimization import adpapt_tensors_if_ypred
 from .global_config import (
     SERIES_COLUMN_NAME,
     TIMESTEPS_COLUMN_NAME,
@@ -26,7 +23,6 @@ from .global_config import (
     SIMU_PATTERN,
     HP_JSON_FILE,
     PRED_CSV_FILE,
-    PRED_CSV_FILE_TRAIN,
 )
 
 
@@ -58,34 +54,38 @@ def _train_pred_simu(
     y_train_3D_scaled: NDArray,
     x_test_3D_scaled: NDArray,
     inverse_transform_y_pred_3D_scaled: Callable,
+    inverse_transform_y_pred_train_3D_scaled: Callable,
+    n_warmups_offset: float,
 ) -> DataFrame:
-
-    n_warmups = N_WARMUPS
-
-    (
-        x_train_3D_scaled,
-        y_train_3D_scaled,
-        x_test_3D_scaled,
-        y_test_3D_scaled,
-        n_warmups,
-    ) = adpapt_tensors_if_ypred(
-        x_train_3D_scaled,
-        y_train_3D_scaled,
-        x_test_3D_scaled,
-        n_warmups,
-    )
-
-    simu_df = DataFrame()
+    list_df_result = []
     for iseed, model in enumerate(model_list):
-        model.fit(x_train_3D_scaled, y_train_3D_scaled, warmup=n_warmups)
-        y_pred_3D_scaled = model.run(x_test_3D_scaled)
-        if isinstance(y_pred_3D_scaled, list):
-            y_pred_3D_scaled = array(y_pred_3D_scaled)
-        df = inverse_transform_y_pred_3D_scaled(y_pred_3D_scaled)
-        df["iseed"] = iseed
-        simu_df = concat([simu_df, df])
-    simu_df["simulation"] = simulation_name
-    return simu_df
+        model.fit(
+            x_train_3D_scaled,
+            y_train_3D_scaled,
+            warmup=N_WARMUPS + n_warmups_offset,
+        )
+        for name_x, x_3D_scaled, inv_func in [
+            (
+                "train",
+                x_train_3D_scaled,
+                inverse_transform_y_pred_train_3D_scaled,
+            ),
+            (
+                "test",
+                x_test_3D_scaled,
+                inverse_transform_y_pred_3D_scaled,
+            ),
+        ]:
+            y_pred_3D_scaled = model.run(x_3D_scaled)
+            if isinstance(y_pred_3D_scaled, list):
+                y_pred_3D_scaled = array(y_pred_3D_scaled)
+            df_pred = inv_func(y_pred_3D_scaled)
+            df_pred["simulation"] = simulation_name
+            df_pred["iseed"] = iseed
+            df_pred["dataset"] = name_x
+            list_df_result.append(df_pred)
+
+    return concat(list_df_result)
 
 
 # def _train_pred_simu(
@@ -139,52 +139,8 @@ def train_pred_loop(study_config: ModuleType):
             x_test_3D_scaled,
             _,
             inverse_transform_y_pred_3D_scaled,
-        ) = prepare_data(
-            df_train=df_simu,
-            df_test=df_test,
-            x_labels=study_config.X_LABELS,
-            y_labels=study_config.Y_LABELS,
-            x_scaler=SCALER(),
-            y_scaler=SCALER(),
-        )
-
-        df_pred_simu = _train_pred_simu(
-            simulation_name,
-            tsteps,
-            model_list,
-            x_train_3D_scaled,
-            y_train_3D_scaled,
-            x_test_3D_scaled,
-            inverse_transform_y_pred_3D_scaled,
-        )
-
-        results_df = concat([results_df, df_pred_simu])
-
-    results_df.to_csv(PRED_CSV_FILE, index=False)
-
-
-def train_pred_loop_omg_so_ugly(study_config: ModuleType):
-
-    df_test = get_dataframe(DATA_DIR + "/" + TEST_FILE)
-    tsteps = df_test[TIMESTEPS_COLUMN_NAME].to_numpy()
-
-    results_df = DataFrame()
-    for file_simu in Path(DATA_DIR).glob(SIMU_PATTERN):
-        simulation_name = file_simu.name
-
-        print(f"\n{simulation_name}")
-        # reinitialize the models
-        model_list = _get_model_list()
-
-        # load the simulation data
-        df_simu = get_dataframe(file_simu)
-
-        (
-            x_train_3D_scaled,
-            y_train_3D_scaled,
-            x_test_3D_scaled,
-            _,
-            inverse_transform_y_pred_3D_scaled,
+            inverse_transform_y_pred_train_3D_scaled,
+            n_warmups_offset,
         ) = prepare_data(
             df_train=df_simu,
             df_test=df_simu,  # !!!
@@ -202,8 +158,10 @@ def train_pred_loop_omg_so_ugly(study_config: ModuleType):
             y_train_3D_scaled,
             x_test_3D_scaled,
             inverse_transform_y_pred_3D_scaled,
+            inverse_transform_y_pred_train_3D_scaled,
+            n_warmups_offset,
         )
 
         results_df = concat([results_df, df_pred_simu])
 
-    results_df.to_csv(PRED_CSV_FILE_TRAIN, index=False)  # !!!
+    results_df.to_csv(PRED_CSV_FILE, index=False)

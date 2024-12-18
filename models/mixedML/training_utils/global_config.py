@@ -11,8 +11,12 @@ DATA_DIR = (
 )
 TEST_FILE = "01_test.csv"
 SIMU_PATTERN = "simulation*.csv"
-SERIES_COLUMN_NAME = "individus"
-TIMESTEPS_COLUMN_NAME = "temps"
+###########
+# they are now defined in the mixedml module
+# becvause they must correspond to the Rscript (so it's a better place to set them)
+# SERIES_COLUMN_NAME = "individus"
+# TIMESTEPS_COLUMN_NAME = "temps"
+###########
 SCALER = RobustScaler
 # reservoirpy
 N_WARMUPS = 5

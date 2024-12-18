@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 from pandas import DataFrame, read_csv
 from reservoirpy.nodes import ESN  # type: ignore
 from sklearn.metrics import mean_squared_error as mse  # type: ignore
+from optuna import Trial, TrialPruned
 
 
 # !!! please set similar values in the R scripts
@@ -180,10 +181,10 @@ class MixedMLEstimator:
         df_data: DataFrame,
         *,
         n_iter_improve: int,
-        min_ratio_improve: float,
+        min_rltv_imprv: float,
         fixed_model_options: Optional[dict] = None,
     ) -> list[float]:
-        assert 0 <= min_ratio_improve < 1
+        assert 0 <= min_rltv_imprv < 1
         if fixed_model_options is None:
             fixed_model_options = {}
         # initialization
@@ -199,7 +200,7 @@ class MixedMLEstimator:
             #
             if (
                 best_metric is None
-                or metric < (1 - min_ratio_improve) * best_metric
+                or metric < (1 - min_rltv_imprv) * best_metric
             ):
                 print(" (best)")
                 best_metric = metric

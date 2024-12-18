@@ -35,6 +35,7 @@ Training/prediction steps:
 
 """
 from types import ModuleType
+from typing import Union
 
 from numpy import mean, array, isnan
 from numpy.typing import NDArray
@@ -91,7 +92,7 @@ def check_if_use_yprey(
     x_train_3D_scaled: NDArray,
     x_test_3D_scaled: NDArray,
 ) -> bool:
-
+    # we look for Nan in the first tstep (y @ t-1 is Nan)
     train_tmp = x_train_3D_scaled[:, 0, :]
     test_tmp = x_test_3D_scaled[:, 0, :]
 
@@ -108,15 +109,17 @@ def adpapt_tensors_if_ypred(
     x_train_3D_scaled: NDArray,
     y_train_3D_scaled: NDArray,
     x_test_3D_scaled: NDArray,
-    y_test_3D_scaled: NDArray,
+    y_test_3D_scaled: Union[NDArray, None],
     n_warmups: int,
 ) -> tuple[NDArray, NDArray, NDArray, NDArray, int]:
+    # !!! could be in data but must find how to handle N_WARMUPS properly
     if check_if_use_yprey(x_train_3D_scaled, x_test_3D_scaled):
         n_warmups -= 1
         x_train_3D_scaled = x_train_3D_scaled[:, 1:, :]
         y_train_3D_scaled = y_train_3D_scaled[:, 1:, :]
         x_test_3D_scaled = x_test_3D_scaled[:, 1:, :]
-        y_test_3D_scaled = y_test_3D_scaled[:, 1:, :]
+        if y_test_3D_scaled:
+            y_test_3D_scaled = y_test_3D_scaled[:, 1:, :]
     return (
         x_train_3D_scaled,
         y_train_3D_scaled,
