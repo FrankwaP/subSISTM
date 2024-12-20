@@ -5,29 +5,24 @@ from pathlib import Path
 from reservoirpy import set_seed, verbosity  # type: ignore
 from sklearn.preprocessing import RobustScaler  # type: ignore
 
-DATA_DIR = (
-    (Path(__file__).parent / Path("../../../data/synthetic_bph_1/"))
-    .resolve()
-    .as_posix()
-)
+DATA_DIR = Path("../../../data/synthetic_bph_1/").resolve().as_posix()
+print("Data folder:", DATA_DIR)
 TEST_FILE = "01_test.csv"
 SIMU_PATTERN = "simulation*.csv"
-SERIES_COLUMN_NAME = "individus"
-TIMESTEPS_COLUMN_NAME = "temps"
+SERIES = "individus"
+TSTEPS = "temps"
+SORT_COLUMNS = [SERIES, TSTEPS]
 SCALER = RobustScaler
 
-set_seed(42)
-verbosity(0)
-
-FLOAT_DTYPE = "float32"
 
 # reservoirpy
+FLOAT_DTYPE = "float32"
 N_WARMUPS = 5
 N_SEEDS = 5
-N_CPUS = 5  # negative number => CPU_USED = MAX_CPU + N_CPUS
+N_CPUS = N_SEEDS  # negative number => CPU_USED = MAX_CPU + N_CPUS
 JOBLIB_BACKEND: Literal["threading", "multiprocessing", "loky"] = "loky"
 set_seed(0)
-verbosity(1)
+verbosity(0)
 # HP optimization
 HP_JSON_FILE = "HP_medians.json"
 

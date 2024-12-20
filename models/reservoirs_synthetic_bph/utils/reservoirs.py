@@ -9,7 +9,12 @@ from numpy.typing import NDArray
 from reservoirpy import Model  # type: ignore
 from reservoirpy.nodes import ESN, Reservoir, Ridge  # type: ignore
 
-from .global_config import N_CPUS, N_SEEDS, JOBLIB_BACKEND, FLOAT_DTYPE
+from .global_config import (
+    N_CPUS,
+    N_SEEDS,
+    JOBLIB_BACKEND,
+    FLOAT_DTYPE,
+)
 
 
 def get_esn_model_list(
@@ -65,7 +70,7 @@ class ReservoirEnsemble:
         reservoir_kwargs: dict,
         ridge_kwargs: dict,
         n_seeds: int = N_SEEDS,
-        n_procs: int = N_SEEDS,
+        n_procs: int = N_CPUS,
         dtype: dtype = FLOAT_DTYPE,
     ):
         assert "dtype" not in reservoir_kwargs
@@ -79,6 +84,7 @@ class ReservoirEnsemble:
         self._nprocs = n_procs
 
     def fit(self, X: NDArray, y: NDArray, **options_fit) -> None:
+        assert X.ndim == 3
         if not self._nprocs:
             for m in self._models:
                 m.fit(X, y, **options_fit)
@@ -93,6 +99,7 @@ class ReservoirEnsemble:
                 )
 
     def run(self, X: NDArray) -> NDArray:
+        assert X.ndim == 3
         if self._nprocs == 0:
             preds = [m.run(X) for m in self._models]
         else:

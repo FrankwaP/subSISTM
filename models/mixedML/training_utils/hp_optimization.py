@@ -34,37 +34,66 @@ Training/prediction steps:
         MAE/MSE on test
 
 """
-from sys import path
+import sys
+from pathlib import Path
 
-path.append("..")
+
+def add_path(p: str) -> None:
+    pth = Path(p).resolve().as_posix()
+    print("Added to path:", pth)
+    sys.path.append(pth)
 
 
-from numpy import mean
+add_path("../../")
+
 from pandas import DataFrame
 from optuna import Trial, create_study, samplers
 from optuna.logging import set_verbosity, DEBUG
+from optuna.pruners import MedianPruner
 
 from reservoirpy.observables import mse  # type: ignore
 
-
-from .trial_model_multiprocessing import multi_proc_fit_and_predict_trial
-from .data import get_dataframe, remove_warmup_1D
-from .global_config import N_WARMUPS, SCALER
-from mixed_ml.mixed_ml import (
+from reservoirs_synthetic_bph.utils.reservoirs import ReservoirEnsemble
+from reservoirs_synthetic_bph.utils.data import get_dataframe
+from reservoirs_synthetic_bph.utils.global_config import (
+    N_WARMUPS,
+    SCALER,
     SERIES,
     TSTEPS,
+)
+
+
+from mixedML.mixed_ml.mixed_ml import (
+    MixedMLEstimator,
     X_LABELS,
     Y_LABEL,
 )
 
 
 # optuna
-N_STARTUP_TRIALS = 20
-N_TPE_TRIALS = 10
+N_STARTUP_TRIALS = 100
+N_TPE_TRIALS = 50
 set_verbosity(DEBUG)
 
 
 # %%
+
+
+def _get_trial_model(trial: Trial) -> MixedMLEstimator:
+    reservoir_dict = dict(
+        units=trial.suggest_int("N", 10, 200),
+        sr=trial.suggest_float("sr", 1e-4, 1e1, log=True),
+        lr=trial.suggest_float("lr", 1e-4, 1e0, log=True),
+        input_scaling=trial.suggest_float(
+            "input_scaling", 1e-1, 1e1, log=True
+        ),
+    )
+    ridge_dict = dict(
+        ridge=trial.suggest_float("ridge", 1e-8, 1e2, log=True),
+    )
+    return MixedMLEstimator(
+        ReservoirEnsemble(reservoir_dict, ridge_dict), recurrent_model=True
+    )
 
 
 def _optuna_objective(
@@ -73,41 +102,28 @@ def _optuna_objective(
     df_val_scaled: DataFrame,
 ) -> tuple[float, int]:
 
-    options_fit = dict(
-        df_data=df_train_scaled,
-        n_iter_improve=1,
-        min_ratio_improve=0.01,
-        fixed_model_options={"warmup": N_WARMUPS},
+    model = _get_trial_model(trial)
+    model.fit(
+        df_train_scaled,
+        n_iter_improv=3,
+        min_rltv_imrov=0.01,
+        trial_for_pruning=trial,
+        fixed_model_fit_options={"warmup": N_WARMUPS},
     )
-    option_pred = dict(
-        df_data=df_val_scaled,
-        use_subject_specific=True,
-    )
-    list_y_pred_3D_scaled = multi_proc_fit_and_predict_trial(
-        trial, options_fit, option_pred
-    )
-
-    #################
-    # old way: no multiprocessing
-    # for model in _get_trial_model_list(trial):
-    #     model.fit(
-    #         df_train_scaled,
-    #         n_iter_improve=3,
-    #         fixed_model_options={"warmup": N_WARMUPS},
-    #     )
-    #     y_pred_3D_scaled = model.predict(
-    #         df_val_scaled, use_subject_specific=True
-    #     )
-    #     list_y_pred_3D_scaled.append(y_pred_3D_scaled)
-    #################
-    y_pred_3D_scaled_mean = mean(list_y_pred_3D_scaled, axis=0)
-    y_val_3D_scaled = df_val_scaled[Y_LABEL]
-    return (
-        mse(
-            remove_warmup_1D(y_pred_3D_scaled_mean, N_WARMUPS),
-            remove_warmup_1D(y_val_3D_scaled, N_WARMUPS),
-        ),
-        trial.params["N"],
+    y_pred_3D_scaled = model.predict(df_val_scaled, use_subject_specific=True)
+    y_val_3D_scaled = df_val_scaled[Y_LABEL].to_numpy()
+    assert y_pred_3D_scaled.ndim == 1
+    # return (
+    #     mse(
+    #         y_pred_3D_scaled[N_WARMUPS:],
+    #         y_val_3D_scaled[N_WARMUPS:],
+    #     ),
+    #     trial.params["N"],
+    # )
+    N_factor = 0.001
+    return (1 + N_factor * trial.params["N"]) * mse(
+        y_pred_3D_scaled[N_WARMUPS:],
+        y_val_3D_scaled[N_WARMUPS:],
     )
 
 
@@ -123,8 +139,10 @@ def _run_study(
     study = create_study(
         study_name=study_name,
         storage=storage_name,
-        directions=["minimize", "minimize"],
+        # directions=["minimize", "minimize"],
+        directions=["minimize"],
         load_if_exists=True,
+        pruner=MedianPruner(),
     )
 
     # study.sampler = CatCmaSampler()
@@ -141,21 +159,22 @@ def _run_study(
     )
 
 
-def _run_test_study(
-    df_train_scaled: DataFrame,
-    df_val_scaled: DataFrame,
-) -> None:
-    study = create_study(
-        study_name="OSEF",
-        directions=["minimize"],
-        load_if_exists=True,
-    )
+# def _run_test_study(
+#     df_train_scaled: DataFrame,
+#     df_val_scaled: DataFrame,
+# ) -> None:
+#     study = create_study(
+#         study_name="OSEF",
+#         directions=["minimize"],
+#         load_if_exists=True,
+#     )
 
-    study.sampler = samplers.RandomSampler(seed=0)
-    study.optimize(
-        lambda x: _optuna_objective(x, df_train_scaled, df_val_scaled),
-        n_trials=2,
-    )
+#     study.sampler = samplers.RandomSampler(seed=0)
+#     study.optimize(
+#         lambda x: _optuna_objective(x, df_train_scaled, df_val_scaled),
+#         n_trials=2,
+
+#     )
 
 
 def run_optimization(opti_idx: int) -> None:

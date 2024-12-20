@@ -1,6 +1,7 @@
 from typing import Callable, Union
 from pathlib import Path
 
+from numpy import array, stack
 from numpy.typing import NDArray
 from pandas import read_csv, DataFrame
 
@@ -10,9 +11,11 @@ from sklearn.utils.validation import check_is_fitted  # type: ignore
 from sklearn.exceptions import NotFittedError  # type: ignore
 
 from .global_config import (
-    SERIES_COLUMN_NAME,
-    TIMESTEPS_COLUMN_NAME,
+    SERIES,
+    TSTEPS,
+    SORT_COLUMNS,
     FLOAT_DTYPE,
+    SCALER,
 )
 
 
@@ -45,13 +48,36 @@ DTYPES = {
 def get_dataframe(filename: Union[str, Path]) -> DataFrame:
     df = read_csv(filename, sep=";", decimal=",", dtype=DTYPES)
     for ylab in ["y_mixed", "y_mixed_obs", "y_fixed", "y_fixed_obs"]:
-        df[ylab + "-1"] = df.groupby(SERIES_COLUMN_NAME)[ylab].shift(+1)
+        df[ylab + "-1"] = df.groupby(SERIES)[ylab].shift(+1)
     return df
 
 
+class DataConverter:
+
+    def df_to_array3D(self, df: DataFrame) -> NDArray:
+        df = df.sort_values(SORT_COLUMNS)
+        others = [c for c in df.columns if c not in SORT_COLUMNS]
+        arr = stack(df.groupby([SERIES])[others].apply(array)).shape
+        self.NS, self.NT, self.NL = arr.shape
+        self.series = df[SERIES]
+        self.tsteps = df[TSTEPS]
+        self.others = others
+        assert self.NS == len(df[SERIES].unique())
+        assert self.NT == len(df[TSTEPS].unique())
+        assert self.NL == len(others)
+        return arr
+
+    def array3D_to_df(self, arr: NDArray) -> DataFrame:
+        df = DataFrame({SERIES: self.series, TSTEPS: self.tsteps})
+        df[self.others] = arr.reshape(self.NS * self.NT, self.NL)
+        self.NS, self.NT, self.NL = None, None, None
+        self.series, self.tsteps, self.others = None, None, None
+        return df
+
+
 def remove_warmup_df(df: DataFrame, n_warmups: int) -> DataFrame:
-    tsteps = sorted(df[TIMESTEPS_COLUMN_NAME].unique())
-    return df[df[TIMESTEPS_COLUMN_NAME] > tsteps[n_warmups - 1]]
+    tsteps = sorted(df[TSTEPS].unique())
+    return df[df[TSTEPS] > tsteps[n_warmups - 1]]
 
 
 def remove_warmup_3D(array_3D: NDArray, n_warmups: int) -> NDArray:
@@ -72,28 +98,25 @@ def prepare_data(
     df_test: DataFrame,
     x_labels: list[str],
     y_labels: list[str],
-    x_scaler: TransformerMixin,
-    y_scaler: TransformerMixin,
+    x_scaler: TransformerMixin = SCALER,
+    y_scaler: TransformerMixin = SCALER,
 ) -> tuple[NDArray, NDArray, NDArray, NDArray, Callable, Callable, float]:
 
     Nx = len(x_labels)
     Ny = len(y_labels)
-    sort_columns = [SERIES_COLUMN_NAME, TIMESTEPS_COLUMN_NAME]
 
     ####
     # case where we use y(t-1) in the covariates, and we have NaN for the first timestep
-    tsteps_train0 = df_train[TIMESTEPS_COLUMN_NAME].unique()
     df_train.dropna(inplace=True)
     df_test.dropna(inplace=True)
-    tsteps_train = df_train[TIMESTEPS_COLUMN_NAME].unique()
-    tsteps_test = df_test[TIMESTEPS_COLUMN_NAME].unique()
+    tsteps_train = df_train[TSTEPS].unique()
+    tsteps_test = df_test[TSTEPS].unique()
     assert (tsteps_train == tsteps_test).all()
-    n_warmups_offset = len(tsteps_train) - len(tsteps_train0)
     ####
     #
-    df_train.sort_values(sort_columns, inplace=True)
-    Ns_train = len(df_train[SERIES_COLUMN_NAME].unique())
-    Nt_train = len(df_train[TIMESTEPS_COLUMN_NAME].unique())
+    df_train.sort_values(SORT_COLUMNS, inplace=True)
+    Ns_train = len(df_train[SERIES].unique())
+    Nt_train = len(df_train[TSTEPS].unique())
     x_train_3D_scaled = x_scaler.fit_transform(df_train[x_labels]).reshape(
         (Ns_train, Nt_train, Nx)
     )
@@ -102,9 +125,9 @@ def prepare_data(
     )
     print(f"Train set is {Ns_train} individuals")
     #
-    df_test.sort_values(sort_columns, inplace=True)
-    Ns_test = len(df_test[SERIES_COLUMN_NAME].unique())
-    Nt_test = len(df_test[TIMESTEPS_COLUMN_NAME].unique())
+    df_test.sort_values(SORT_COLUMNS, inplace=True)
+    Ns_test = len(df_test[SERIES].unique())
+    Nt_test = len(df_test[TSTEPS].unique())
     x_test_3D_scaled = x_scaler.transform(df_test[x_labels]).reshape(
         (Ns_test, Nt_test, Nx)
     )
@@ -116,7 +139,7 @@ def prepare_data(
     def _inverse_transform_y_pred_3D_scaled(
         y_pred_3D_scaled: NDArray, df_format: DataFrame, Ns: int, Nt: int
     ) -> DataFrame:
-        df = df_format[[SERIES_COLUMN_NAME, TIMESTEPS_COLUMN_NAME]].copy()
+        df = df_format[[SERIES, TSTEPS]].copy()
         df["pred"] = y_scaler.inverse_transform(
             y_pred_3D_scaled.reshape((Ns * Nt, Ny))
         )
@@ -143,5 +166,4 @@ def prepare_data(
         y_test_3D_scaled,
         inverse_transform_y_test_3D_scaled,
         inverse_transform_y_train_3D_scaled,
-        n_warmups_offset,
     )
