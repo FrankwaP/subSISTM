@@ -45,11 +45,15 @@ DTYPES = {
 }
 
 
-def get_dataframe(filename: Union[str, Path]) -> DataFrame:
+def get_dataframe(
+    filename: Union[str, Path], x_labels: list[str], y_labels: list[str]
+) -> DataFrame:
     df = read_csv(filename, sep=";", decimal=",", dtype=DTYPES)
     for ylab in ["y_mixed", "y_mixed_obs", "y_fixed", "y_fixed_obs"]:
         df[ylab + "-1"] = df.groupby(SERIES)[ylab].shift(+1)
-    return df
+    cols = [SERIES, TSTEPS] + x_labels + y_labels
+    # dropna for the  case where we use y(t-1) in the covariates
+    return df[cols].dropna().sort_values(SORT_COLUMNS)
 
 
 class DataConverter:
@@ -100,19 +104,20 @@ def prepare_data(
     y_labels: list[str],
     x_scaler: TransformerMixin = SCALER,
     y_scaler: TransformerMixin = SCALER,
-) -> tuple[NDArray, NDArray, NDArray, NDArray, Callable, Callable, float]:
+) -> tuple[
+    NDArray,
+    NDArray,
+    NDArray,
+    NDArray,
+    DataFrame,
+    DataFrame,
+    Callable,
+    Callable,
+]:
 
     Nx = len(x_labels)
     Ny = len(y_labels)
 
-    ####
-    # case where we use y(t-1) in the covariates, and we have NaN for the first timestep
-    df_train.dropna(inplace=True)
-    df_test.dropna(inplace=True)
-    tsteps_train = df_train[TSTEPS].unique()
-    tsteps_test = df_test[TSTEPS].unique()
-    assert (tsteps_train == tsteps_test).all()
-    ####
     #
     df_train.sort_values(SORT_COLUMNS, inplace=True)
     Ns_train = len(df_train[SERIES].unique())
@@ -120,6 +125,7 @@ def prepare_data(
     x_train_3D_scaled = x_scaler.fit_transform(df_train[x_labels]).reshape(
         (Ns_train, Nt_train, Nx)
     )
+    y_train_2D = df_train[SORT_COLUMNS + y_labels]
     y_train_3D_scaled = y_scaler.fit_transform(df_train[y_labels]).reshape(
         (Ns_train, Nt_train, Ny)
     )
@@ -131,16 +137,17 @@ def prepare_data(
     x_test_3D_scaled = x_scaler.transform(df_test[x_labels]).reshape(
         (Ns_test, Nt_test, Nx)
     )
+    y_test_2D = df_test[SORT_COLUMNS + y_labels]
     y_test_3D_scaled = y_scaler.transform(df_test[y_labels]).reshape(
         (Ns_test, Nt_test, Ny)
     )
-    print(f"Train set is {Ns_test} individuals")
+    print(f"Test set is {Ns_test} individuals")
 
     def _inverse_transform_y_pred_3D_scaled(
         y_pred_3D_scaled: NDArray, df_format: DataFrame, Ns: int, Nt: int
     ) -> DataFrame:
         df = df_format[[SERIES, TSTEPS]].copy()
-        df["pred"] = y_scaler.inverse_transform(
+        df[y_labels] = y_scaler.inverse_transform(
             y_pred_3D_scaled.reshape((Ns * Nt, Ny))
         )
         return df
@@ -164,6 +171,8 @@ def prepare_data(
         y_train_3D_scaled,
         x_test_3D_scaled,
         y_test_3D_scaled,
+        y_train_2D,
+        y_test_2D,
         inverse_transform_y_test_3D_scaled,
         inverse_transform_y_train_3D_scaled,
     )

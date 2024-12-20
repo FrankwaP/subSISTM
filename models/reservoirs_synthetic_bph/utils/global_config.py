@@ -28,4 +28,3 @@ HP_JSON_FILE = "HP_medians.json"
 
 # MAE/MSE
 PRED_CSV_FILE = "predictions.csv"
-PRED_CSV_FILE_TRAIN = "predictions_train.csv"

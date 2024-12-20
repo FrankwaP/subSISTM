@@ -35,9 +35,8 @@ Training/prediction steps:
 
 """
 from types import ModuleType
-from typing import Union
 
-from numpy import mean, array, isnan
+from numpy import mean, array
 from numpy.typing import NDArray
 from optuna import Trial, create_study, samplers
 from optuna.logging import set_verbosity, DEBUG
@@ -88,45 +87,45 @@ def _get_trial_model_list(trial: Trial) -> list[ESN]:
     return get_esn_model_list(reservoir_kwargs, ridge_kwargs, ens_kwargs)
 
 
-def check_if_use_yprey(
-    x_train_3D_scaled: NDArray,
-    x_test_3D_scaled: NDArray,
-) -> bool:
-    # we look for Nan in the first tstep (y @ t-1 is Nan)
-    train_tmp = x_train_3D_scaled[:, 0, :]
-    test_tmp = x_test_3D_scaled[:, 0, :]
+# def check_if_use_yprey(
+#     x_train_3D_scaled: NDArray,
+#     x_test_3D_scaled: NDArray,
+# ) -> bool:
+#     # we look for Nan in the first tstep (y @ t-1 is Nan)
+#     train_tmp = x_train_3D_scaled[:, 0, :]
+#     test_tmp = x_test_3D_scaled[:, 0, :]
 
-    shp = train_tmp.shape[1]
+#     shp = train_tmp.shape[1]
 
-    for i in range(shp):
-        if isnan(train_tmp[0, i]):
-            assert all(isnan(train_tmp[:, i]))
-            assert all(isnan(test_tmp[:, i]))
-            return True
+#     for i in range(shp):
+#         if isnan(train_tmp[0, i]):
+#             assert all(isnan(train_tmp[:, i]))
+#             assert all(isnan(test_tmp[:, i]))
+#             return True
 
 
-def adpapt_tensors_if_ypred(
-    x_train_3D_scaled: NDArray,
-    y_train_3D_scaled: NDArray,
-    x_test_3D_scaled: NDArray,
-    y_test_3D_scaled: Union[NDArray, None],
-    n_warmups: int,
-) -> tuple[NDArray, NDArray, NDArray, NDArray, int]:
-    # !!! could be in data but must find how to handle N_WARMUPS properly
-    if check_if_use_yprey(x_train_3D_scaled, x_test_3D_scaled):
-        n_warmups -= 1
-        x_train_3D_scaled = x_train_3D_scaled[:, 1:, :]
-        y_train_3D_scaled = y_train_3D_scaled[:, 1:, :]
-        x_test_3D_scaled = x_test_3D_scaled[:, 1:, :]
-        if y_test_3D_scaled:
-            y_test_3D_scaled = y_test_3D_scaled[:, 1:, :]
-    return (
-        x_train_3D_scaled,
-        y_train_3D_scaled,
-        x_test_3D_scaled,
-        y_test_3D_scaled,
-        n_warmups,
-    )
+# def adpapt_tensors_if_ypred(
+#     x_train_3D_scaled: NDArray,
+#     y_train_3D_scaled: NDArray,
+#     x_test_3D_scaled: NDArray,
+#     y_test_3D_scaled: Union[NDArray, None],
+#     n_warmups: int,
+# ) -> tuple[NDArray, NDArray, NDArray, NDArray, int]:
+#     # !!! could be in data but must find how to handle N_WARMUPS properly
+#     if check_if_use_yprey(x_train_3D_scaled, x_test_3D_scaled):
+#         n_warmups -= 1
+#         x_train_3D_scaled = x_train_3D_scaled[:, 1:, :]
+#         y_train_3D_scaled = y_train_3D_scaled[:, 1:, :]
+#         x_test_3D_scaled = x_test_3D_scaled[:, 1:, :]
+#         if y_test_3D_scaled:
+#             y_test_3D_scaled = y_test_3D_scaled[:, 1:, :]
+#     return (
+#         x_train_3D_scaled,
+#         y_train_3D_scaled,
+#         x_test_3D_scaled,
+#         y_test_3D_scaled,
+#         n_warmups,
+#     )
 
 
 def _optuna_objective(
@@ -137,24 +136,9 @@ def _optuna_objective(
     y_test_3D_scaled: NDArray,
 ) -> tuple[float, int]:
     list_mse_scaled = []
-    n_warmups = N_WARMUPS
-
-    (
-        x_train_3D_scaled,
-        y_train_3D_scaled,
-        x_test_3D_scaled,
-        y_test_3D_scaled,
-        n_warmups,
-    ) = adpapt_tensors_if_ypred(
-        x_train_3D_scaled,
-        y_train_3D_scaled,
-        x_test_3D_scaled,
-        y_test_3D_scaled,
-        n_warmups,
-    )
 
     for model in _get_trial_model_list(trial):
-        model.fit(x_train_3D_scaled, y_train_3D_scaled, warmup=n_warmups)
+        model.fit(x_train_3D_scaled, y_train_3D_scaled, warmup=N_WARMUPS)
 
         y_pred_3D_scaled = model.run(x_test_3D_scaled)
         if isinstance(y_pred_3D_scaled, list):
@@ -162,8 +146,8 @@ def _optuna_objective(
 
         list_mse_scaled.append(
             mse(
-                remove_warmup_3D(y_pred_3D_scaled, n_warmups),
-                remove_warmup_3D(y_test_3D_scaled, n_warmups),
+                remove_warmup_3D(y_pred_3D_scaled, N_WARMUPS),
+                remove_warmup_3D(y_test_3D_scaled, N_WARMUPS),
             )
         )
     return mean(list_mse_scaled), trial.params["N"]
