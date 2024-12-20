@@ -1,16 +1,29 @@
 # -*- coding: utf-8 -*-
+import sys
 from pathlib import Path
+
+
+def add_path(p: str) -> None:
+    pth = Path(p).resolve().as_posix()
+    if pth not in sys.path:
+        print("Added to sys.path:", pth)
+        sys.path.append(pth)
+
+
+add_path("../../")
+
 from subprocess import check_call
 from copy import deepcopy
-from typing import Optional
 
 from joblib import dump  # type: ignore
-from numpy import array
+from numpy import array, inf
 from numpy.typing import NDArray
 from pandas import DataFrame, read_csv
 from reservoirpy.nodes import ESN  # type: ignore
 from sklearn.metrics import mean_squared_error as mse  # type: ignore
 from optuna import Trial, TrialPruned
+
+from reservoirs_synthetic_bph.utils.global_config import SERIES, TSTEPS
 
 
 # !!! please set similar values in the R scripts
@@ -37,16 +50,11 @@ R_CSV_PRED = RSLT_DIR + "/random_effect_predict.csv"
 
 ###
 
-SERIES = "individus"
-TSTEPS = "temps"
 X_LABELS = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"]
-Y_LABEL = "y_mixed_obs"  # the values are fixed
+Y_LABEL = "y_mixed_obs"
 
-# the paper says "y_fixed" for "y fixed effects"
-# but it can be understood as "y not changing"
-# so I call it "y_fe"
 
-Y_LABEL_FE = Y_LABEL + "__fixed"  # the value are not fixed
+Y_LABEL_FE = Y_LABEL + "__fixed"
 
 PY_E_FIXED_COLUMN = "e_fixed"
 R_PRED_SS_COLUMN = "pred_ss"
@@ -65,7 +73,7 @@ class _FixedEffectsEstimator:
         assert len(meth_name) == 1
         self._model_predict = getattr(self.model, meth_name[0])
 
-    def fit(self, X: NDArray, y: NDArray, options: dict) -> None:
+    def fit(self, X: NDArray, y: NDArray, **options) -> None:
         self.model.fit(X, y, **options)
 
     def predict(self, X: NDArray) -> NDArray:
@@ -100,8 +108,8 @@ class _RecurrentFixedEffectsEstimator(_FixedEffectsEstimator):
         self.n_series, self.n_tsteps = None, None
         return y
 
-    def fit(self, X: NDArray, y: NDArray, options: dict) -> None:
-        super().fit(self.trans_input(X), self.trans_input(y), options)
+    def fit(self, X: NDArray, y: NDArray, **options) -> None:
+        super().fit(self.trans_input(X), self.trans_input(y), **options)
 
     def predict(self, X: NDArray) -> NDArray:
         return self.trans_y_output(super().predict(self.trans_input(X)))
@@ -153,7 +161,7 @@ class MixedMLEstimator:
         # to get an estimate of y_fixed
         if isinstance(self.ml_fixed, _RecurrentFixedEffectsEstimator):
             self.ml_fixed.prepare(df)
-        self.ml_fixed.fit(X, y, fixed_model_option)
+        self.ml_fixed.fit(X, y, **fixed_model_option)
         y_fixed = self.ml_fixed.predict(X)
 
         #### fitting the Random Effect model
@@ -180,39 +188,41 @@ class MixedMLEstimator:
         self,
         df_data: DataFrame,
         *,
-        n_iter_improve: int,
-        min_rltv_imprv: float,
-        fixed_model_options: Optional[dict] = None,
+        n_iter_improv: int,
+        min_rltv_imrov: float,
+        trial_for_pruning: Trial = None,
+        fixed_model_fit_options: dict,
     ) -> list[float]:
-        assert 0 <= min_rltv_imprv < 1
-        if fixed_model_options is None:
-            fixed_model_options = {}
         # initialization
         istep = 0
         df = df_data.copy()  # we are going to modify it for fitting
         df[Y_LABEL_FE] = df[Y_LABEL]
         # iteration
         metric_list = []
-        best_metric = None
+        best_metric = inf
+        n_it_no_improv = 0
         while True:
-            df, metric = self.fit_iteration(df, fixed_model_options)
+            df, metric = self.fit_iteration(df, fixed_model_fit_options)
             print(f"mixedML step #{istep:02d}: {metric:8e}", end="")
             #
-            if (
-                best_metric is None
-                or metric < (1 - min_rltv_imprv) * best_metric
-            ):
-                print(" (best)")
+            if metric < (1 - min_rltv_imrov) * best_metric:
+                print("")
                 best_metric = metric
-                n_it_no_improve = 0
                 best_ml_fixed = deepcopy(self.ml_fixed)
                 Path(R_RDS).rename(R_RDS_BEST)
+                n_it_no_improv = 0
             else:
-                print("")
-                n_it_no_improve += 1
-                if n_it_no_improve > n_iter_improve:
+                print(" (no improvement)")
+                n_it_no_improv += 1
+                if n_it_no_improv > n_iter_improv:
                     break
+            #
             metric_list.append(metric)
+            if trial_for_pruning:
+                trial_for_pruning.report(metric, istep)
+                # Handle pruning based on the intermediate value.
+                if trial_for_pruning.should_prune():
+                    raise TrialPruned()
             istep += 1
         #
         self.ml_fixed = best_ml_fixed
