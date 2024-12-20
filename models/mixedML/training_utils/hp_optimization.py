@@ -81,7 +81,7 @@ set_verbosity(DEBUG)
 
 def _get_trial_model(trial: Trial) -> MixedMLEstimator:
     reservoir_dict = dict(
-        units=trial.suggest_int("N", 10, 200),
+        units=trial.suggest_int("N", 10, 500),
         sr=trial.suggest_float("sr", 1e-4, 1e1, log=True),
         lr=trial.suggest_float("lr", 1e-4, 1e0, log=True),
         input_scaling=trial.suggest_float(
@@ -142,7 +142,7 @@ def _run_study(
         # directions=["minimize", "minimize"],
         directions=["minimize"],
         load_if_exists=True,
-        pruner=MedianPruner(),
+        pruner=MedianPruner(startup_trials=5, n_warmup_steps=3),
     )
 
     # study.sampler = CatCmaSampler()
