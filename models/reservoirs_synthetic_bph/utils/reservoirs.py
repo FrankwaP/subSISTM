@@ -4,7 +4,7 @@ from itertools import repeat
 
 from multiprocessing import Pool
 
-from numpy import dtype, array
+from numpy import array
 from numpy.typing import NDArray
 from reservoirpy import Model  # type: ignore
 from reservoirpy.nodes import ESN, Reservoir, Ridge  # type: ignore
@@ -71,7 +71,7 @@ class ReservoirEnsemble:
         ridge_kwargs: dict,
         n_seeds: int = N_SEEDS,
         n_procs: int = N_CPUS,
-        dtype: dtype = FLOAT_DTYPE,
+        dtype: str = FLOAT_DTYPE,
     ):
         assert "dtype" not in reservoir_kwargs
         assert "dtype" not in ridge_kwargs
@@ -85,6 +85,7 @@ class ReservoirEnsemble:
 
     def fit(self, X: NDArray, y: NDArray, **options_fit) -> None:
         assert X.ndim == 3
+        assert y.ndim == 3 and y.shape[2] == 1
         if not self._nprocs:
             for m in self._models:
                 m.fit(X, y, **options_fit)

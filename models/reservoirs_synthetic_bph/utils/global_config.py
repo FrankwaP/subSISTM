@@ -26,5 +26,6 @@ verbosity(0)
 # HP optimization
 HP_JSON_FILE = "HP_medians.json"
 
-# MAE/MSE
+# results files
 PRED_CSV_FILE = "predictions.csv"
+METRIC_CSV_FILE = "metrics.csv"

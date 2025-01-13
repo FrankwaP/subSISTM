@@ -3,8 +3,8 @@ from sys import path
 
 path.append("../")
 
-from utils.training_prediction import train_pred_loop
+from utils.hp_optimization import run_optimization
 import study_config
 
 
-train_pred_loop(study_config)
+run_optimization(study_config)

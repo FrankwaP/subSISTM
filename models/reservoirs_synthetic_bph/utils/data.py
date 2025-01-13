@@ -1,7 +1,7 @@
 from typing import Callable, Union
 from pathlib import Path
 
-from numpy import array, stack
+# from numpy import array, stack
 from numpy.typing import NDArray
 from pandas import read_csv, DataFrame
 
@@ -49,34 +49,35 @@ def get_dataframe(
     filename: Union[str, Path], x_labels: list[str], y_labels: list[str]
 ) -> DataFrame:
     df = read_csv(filename, sep=";", decimal=",", dtype=DTYPES)
+    # we create the "-1" labels… but maybe they won't be used in the next step (yeah it's not optimal…)
     for ylab in ["y_mixed", "y_mixed_obs", "y_fixed", "y_fixed_obs"]:
         df[ylab + "-1"] = df.groupby(SERIES)[ylab].shift(+1)
-    cols = [SERIES, TSTEPS] + x_labels + y_labels
+    cols = SORT_COLUMNS + x_labels + y_labels
     # dropna for the  case where we use y(t-1) in the covariates
     return df[cols].dropna().sort_values(SORT_COLUMNS)
 
 
-class DataConverter:
+# class DataConverter:
 
-    def df_to_array3D(self, df: DataFrame) -> NDArray:
-        df = df.sort_values(SORT_COLUMNS)
-        others = [c for c in df.columns if c not in SORT_COLUMNS]
-        arr = stack(df.groupby([SERIES])[others].apply(array)).shape
-        self.NS, self.NT, self.NL = arr.shape
-        self.series = df[SERIES]
-        self.tsteps = df[TSTEPS]
-        self.others = others
-        assert self.NS == len(df[SERIES].unique())
-        assert self.NT == len(df[TSTEPS].unique())
-        assert self.NL == len(others)
-        return arr
+#     def df_to_array3D(self, df: DataFrame) -> NDArray:
+#         df = df.sort_values(SORT_COLUMNS)
+#         others = [c for c in df.columns if c not in SORT_COLUMNS]
+#         arr = stack(df.groupby([SERIES])[others].apply(array))
+#         self.NS, self.NT, self.NL = arr.shape
+#         self.series = df[SERIES]
+#         self.tsteps = df[TSTEPS]
+#         self.others = others
+#         assert self.NS == len(df[SERIES].unique())
+#         assert self.NT == len(df[TSTEPS].unique())
+#         assert self.NL == len(others)
+#         return arr
 
-    def array3D_to_df(self, arr: NDArray) -> DataFrame:
-        df = DataFrame({SERIES: self.series, TSTEPS: self.tsteps})
-        df[self.others] = arr.reshape(self.NS * self.NT, self.NL)
-        self.NS, self.NT, self.NL = None, None, None
-        self.series, self.tsteps, self.others = None, None, None
-        return df
+#     def array3D_to_df(self, arr: NDArray) -> DataFrame:
+#         df = DataFrame({SERIES: self.series, TSTEPS: self.tsteps})
+#         df[self.others] = arr.reshape(self.NS * self.NT, self.NL)
+#         self.NS, self.NT, self.NL = None, None, None
+#         self.series, self.tsteps, self.others = None, None, None
+#         return df
 
 
 def remove_warmup_df(df: DataFrame, n_warmups: int) -> DataFrame:
@@ -109,11 +110,12 @@ def prepare_data(
     NDArray,
     NDArray,
     NDArray,
-    DataFrame,
-    DataFrame,
+    # DataFrame,
+    # DataFrame,
     Callable,
     Callable,
 ]:
+    # !!! we work on train and test at the same time because they share the scalers
 
     Nx = len(x_labels)
     Ny = len(y_labels)
@@ -125,7 +127,7 @@ def prepare_data(
     x_train_3D_scaled = x_scaler.fit_transform(df_train[x_labels]).reshape(
         (Ns_train, Nt_train, Nx)
     )
-    y_train_2D = df_train[SORT_COLUMNS + y_labels]
+    # y_train_2D = df_train[SORT_COLUMNS + y_labels]
     y_train_3D_scaled = y_scaler.fit_transform(df_train[y_labels]).reshape(
         (Ns_train, Nt_train, Ny)
     )
@@ -137,7 +139,7 @@ def prepare_data(
     x_test_3D_scaled = x_scaler.transform(df_test[x_labels]).reshape(
         (Ns_test, Nt_test, Nx)
     )
-    y_test_2D = df_test[SORT_COLUMNS + y_labels]
+    # y_test_2D = df_test[SORT_COLUMNS + y_labels]
     y_test_3D_scaled = y_scaler.transform(df_test[y_labels]).reshape(
         (Ns_test, Nt_test, Ny)
     )
@@ -171,8 +173,8 @@ def prepare_data(
         y_train_3D_scaled,
         x_test_3D_scaled,
         y_test_3D_scaled,
-        y_train_2D,
-        y_test_2D,
+        # y_train_2D,
+        # y_test_2D,
         inverse_transform_y_test_3D_scaled,
         inverse_transform_y_train_3D_scaled,
     )

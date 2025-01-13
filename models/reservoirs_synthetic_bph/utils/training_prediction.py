@@ -1,24 +1,17 @@
 # -*- coding: utf-8 -*-
 from pathlib import Path
-from typing import Callable
+
 from types import ModuleType
 from json import load
 
-from numpy.typing import NDArray
 from numpy import array
 from pandas import DataFrame, concat
-from sklearn.metrics import (
-    mean_absolute_error as mae,
-    mean_squared_error as mse,
-)
 
 
 from .data import get_dataframe, prepare_data
-from .reservoirs import get_esn_model_list, ESN, ReservoirEnsemble, Model
+from .reservoirs import ReservoirEnsemble
 
-# from .hp_optimization import adpapt_tensors_if_ypred
 from .global_config import (
-    TSTEPS,
     N_WARMUPS,
     SCALER,
     DATA_DIR,
@@ -26,76 +19,19 @@ from .global_config import (
     SIMU_PATTERN,
     HP_JSON_FILE,
     PRED_CSV_FILE,
-    SORT_COLUMNS,
 )
 
-
-# def _get_model_list() -> list[ESN]:
-
-#     hp_json = load(open(HP_JSON_FILE, "r"))
-
-#     reservoir_kwargs = {
-#         k: v
-#         for k, v in hp_json.items()
-#         if k in ["N", "sr", "lr", "input_scaling"]
-#     }
-#     reservoir_kwargs["units"] = reservoir_kwargs.pop("N")
-
-#     ridge_kwargs = {k: v for k, v in hp_json.items() if k in ["ridge"]}
-
-#     esn_kwargs = {
-#         k: v for k, v in hp_json.items() if k in ["use_raw_inputs", "feedback"]
-#     }
-
-#     return get_esn_model_list(reservoir_kwargs, ridge_kwargs, esn_kwargs)
+# Columns names
+SIMS = "simulation"
+DSET = "dataset"
+TRAIN = "train"
+TEST = "test"
 
 
-# def _train_pred_simu(
-#     simulation_name: str,
-#     tsteps: NDArray,
-#     model_list: list[ESN],
-#     x_train_3D_scaled: NDArray,
-#     y_train_3D_scaled: NDArray,
-#     x_test_3D_scaled: NDArray,
-#     inverse_transform_y_pred_3D_scaled: Callable,
-#     inverse_transform_y_pred_train_3D_scaled: Callable,
-#     n_warmups_offset: float,
-# ) -> DataFrame:
-#     list_df_result = []
-#     for iseed, model in enumerate(model_list):
-#         model.fit(
-#             x_train_3D_scaled,
-#             y_train_3D_scaled,
-#             warmup=N_WARMUPS + n_warmups_offset,
-#         )
-#         for name_x, x_3D_scaled, inv_func in [
-#             (
-#                 "train",
-#                 x_train_3D_scaled,
-#                 inverse_transform_y_pred_train_3D_scaled,
-#             ),
-#             (
-#                 "test",
-#                 x_test_3D_scaled,
-#                 inverse_transform_y_pred_3D_scaled,
-#             ),
-#         ]:
-#             y_pred_3D_scaled = model.run(x_3D_scaled)
-#             if isinstance(y_pred_3D_scaled, list):
-#                 y_pred_3D_scaled = array(y_pred_3D_scaled)
-#             df_pred = inv_func(y_pred_3D_scaled)
-#             df_pred["simulation"] = simulation_name
-#             df_pred["time"] = tsteps
-#             df_pred["iseed"] = iseed
-#             df_pred["dataset"] = name_x
-#             list_df_result.append(df_pred)
+def _get_model() -> ReservoirEnsemble:
 
-#     return concat(list_df_result)
-
-
-def _get_model() -> list[ESN]:
-
-    hp_json = load(open(HP_JSON_FILE, "r"))
+    with open(HP_JSON_FILE, "r", encoding="utf-8") as fjson:
+        hp_json = load(fjson)
 
     assert ("use_raw_inputs" not in hp_json) or (
         hp_json["use_raw_inputs"] is False
@@ -114,7 +50,7 @@ def _get_model() -> list[ESN]:
 
 def _train_pred_simu(
     study_config: ModuleType,
-    model: Model,
+    model: ReservoirEnsemble,
     df_train: DataFrame,
     df_test: DataFrame,
 ) -> DataFrame:
@@ -123,14 +59,12 @@ def _train_pred_simu(
         x_train_3D_scaled,
         y_train_3D_scaled,
         x_test_3D_scaled,
-        y_test_3D_scaled,
-        y_train_2D,
-        y_test_2D,
+        _,
         inverse_transform_y_test_3D_scaled,
         inverse_transform_y_train_3D_scaled,
     ) = prepare_data(
         df_train=df_train,
-        df_test=df_test,  # !!!
+        df_test=df_test,
         x_labels=study_config.X_LABELS,
         y_labels=study_config.Y_LABELS,
         x_scaler=SCALER(),
@@ -143,40 +77,28 @@ def _train_pred_simu(
         warmup=N_WARMUPS,
     )
 
-    list_dict_result = []
-    for dataset, x_3D_scaled, y_2D, inv_func in [
+    df_result = DataFrame()
+    for dataset, x_3D_scaled, inv_func in [
         (
-            "train",
+            TRAIN,
             x_train_3D_scaled,
-            y_train_2D,
             inverse_transform_y_train_3D_scaled,
         ),
         (
-            "test",
+            TEST,
             x_test_3D_scaled,
-            y_test_2D,
             inverse_transform_y_test_3D_scaled,
         ),
     ]:
         y_pred_3D_scaled = model.run(x_3D_scaled)
         if isinstance(y_pred_3D_scaled, list):
             y_pred_3D_scaled = array(y_pred_3D_scaled)
-
         y_pred_2D = inv_func(y_pred_3D_scaled)
-        assert y_pred_2D[SORT_COLUMNS].equals(y_2D[SORT_COLUMNS])
-        for metname, metric in [("mae", mae), ("mse", mse)]:
-            list_dict_result.append(
-                {
-                    "dataset": dataset,
-                    "metric": metname,
-                    "value": metric(
-                        y_pred_2D[study_config.Y_LABELS],
-                        y_2D[study_config.Y_LABELS],
-                    ),
-                }
-            )
 
-    return DataFrame(list_dict_result)
+        y_pred_2D[DSET] = dataset
+        df_result = concat([df_result, y_pred_2D])
+
+    return df_result
 
 
 def train_pred_loop(study_config: ModuleType):
@@ -184,7 +106,7 @@ def train_pred_loop(study_config: ModuleType):
     df_test = get_dataframe(
         DATA_DIR + "/" + TEST_FILE,
         x_labels=study_config.X_LABELS,
-        y_labels=study_config.Y_LABELS,
+        y_labels=study_config.Y_LABELS_TGT,
     )
 
     results_df = DataFrame()
@@ -199,7 +121,7 @@ def train_pred_loop(study_config: ModuleType):
         df_simu = get_dataframe(
             file_simu,
             x_labels=study_config.X_LABELS,
-            y_labels=study_config.Y_LABELS,
+            y_labels=study_config.Y_LABELS_TGT,
         )
 
         df_simu = _train_pred_simu(
@@ -209,7 +131,7 @@ def train_pred_loop(study_config: ModuleType):
             df_test,
         )
 
-        df_simu["simulation"] = simulation_name
+        df_simu[SIMS] = simulation_name
 
         results_df = concat([results_df, df_simu])
 
