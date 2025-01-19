@@ -120,7 +120,7 @@ def _compute_squared_bias(
     ]
 
 
-def _compute_variance(ModuleType, df_pred_test: DataFrame) -> dict:
+def _compute_variance(df_pred_test: DataFrame) -> dict:
     return {
         DSET: TEST,
         METRIC: VAR,
@@ -130,22 +130,20 @@ def _compute_variance(ModuleType, df_pred_test: DataFrame) -> dict:
 
 def _get_bias_and_variance(
     study_config: ModuleType,
-    df_train: DataFrame,
     df_test: DataFrame,
     df_pred: DataFrame,
 ) -> DataFrame:
     df_pred_test = df_pred[df_pred[DSET] == TEST]
     list_dict = _compute_squared_bias(study_config, df_test, df_pred_test)
-    list_dict.append(_compute_variance(study_config, df_pred_test))
+    list_dict.append(_compute_variance(df_pred_test))
     return DataFrame(list_dict)
 
 
 # %%
-def process(study_config: ModuleType) -> tuple[DataFrame, DataFrame]:
+def process(study_config: ModuleType):
     df_train = _get_train_df(study_config)
     df_test = _get_test_df(study_config)
     df_pred = _get_pred_df(study_config)
-    params = (study_config, df_train, df_test, df_pred)
-    df_metrics = _get_metrics(*params)
-    df_bias_var = _get_bias_and_variance(*params)
+    df_metrics = _get_metrics(study_config, df_train, df_test, df_pred)
+    df_bias_var = _get_bias_and_variance(study_config, df_test, df_pred)
     concat([df_metrics, df_bias_var]).to_csv(METRIC_CSV_FILE)

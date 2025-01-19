@@ -21,7 +21,7 @@ from .global_config import (
     PRED_CSV_FILE,
 )
 
-# Columns names
+# same as in the R script
 SIMS = "simulation"
 DSET = "dataset"
 TRAIN = "train"
