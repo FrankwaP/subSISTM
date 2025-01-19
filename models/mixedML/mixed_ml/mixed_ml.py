@@ -151,7 +151,7 @@ class MixedMLEstimator:
         # self.lcmm = random_effects_estimator
         self.lcmm = _RandomEffectsEstimator()
 
-    def fit_iteration(
+    def _fit_iteration(
         self, df: DataFrame, fixed_model_option: dict
     ) -> tuple[DataFrame, float]:
         #### fitting the Machine Learning model
@@ -202,7 +202,7 @@ class MixedMLEstimator:
         best_metric = inf
         n_it_no_improv = 0
         while True:
-            df, metric = self.fit_iteration(df, fixed_model_fit_options)
+            df, metric = self._fit_iteration(df, fixed_model_fit_options)
             print(f"mixedML step #{istep:02d}: {metric:8e}", end="")
             #
             if metric < (1 - min_rltv_imrov) * best_metric:
