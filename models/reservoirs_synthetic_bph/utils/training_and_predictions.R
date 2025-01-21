@@ -81,7 +81,7 @@ forecast <- function(model, data) {
   #   stop("youhou!")
   # }
   ###########
-  for (t in temps[-1:-1]) {
+  for (t in temps[-1]) {
     # a verification has been done with "prev_data <- data"
     # to use all the data as with predictY
     # and… we get the same results as with predictY
@@ -97,9 +97,8 @@ forecast <- function(model, data) {
     if (any(data[data[TSTEP] == t, ][SUBJECT] != ui[SUBJECT])) {
       stop("This is an error message!")
     }
-    # addition of the intercept random effect
-    pred[data[TSTEP] == t] <- pred[data[TSTEP] == t] + ui$intercept
-    reffects <- rowSums(data[data[TSTEP] == t, X_LABELS] * ui[, X_LABELS])
+    # addition of the random effects
+    reffects <- ui$intercept + rowSums(data[data[TSTEP] == t, X_LABELS] * ui[, X_LABELS])
     pred[data[TSTEP] == t] <- pred[data[TSTEP] == t] + reffects
   }
   return(pred)
@@ -126,7 +125,7 @@ get_predict_model <- function() {
 
   #########
   # MULTIPROC
-  # cl <- makeCluster(10)
+  # cl <- makeCluster(10, outfile = "cluster.txt"))
   # # registerDoParallel(cl)
   # registerDoSNOW(cl)
   # pb <- txtProgressBar(max = length(simu_files), style = 3)
