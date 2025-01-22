@@ -5,7 +5,12 @@ from pathlib import Path
 from reservoirpy import set_seed, verbosity  # type: ignore
 from sklearn.preprocessing import RobustScaler  # type: ignore
 
-DATA_DIR = Path("../../../data/synthetic_bph_1/").resolve().as_posix()
+DATA_DIR = (
+    (Path(__file__).parent / Path("../../../data/synthetic_bph_1/"))
+    .resolve()
+    .as_posix()
+)
+assert Path(DATA_DIR).exists()
 print("Data folder:", DATA_DIR)
 TEST_FILE = "01_test.csv"
 SIMU_PATTERN = "simulation*.csv"
