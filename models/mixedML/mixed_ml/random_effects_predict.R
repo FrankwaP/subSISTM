@@ -1,59 +1,54 @@
 library(lcmm)
 
-RSLT_DIR <- 'results'
-R_RDS_BEST <- paste(RSLT_DIR , "/best_random_hlme.Rds", sep = '')
-PY_CSV_PRED <- paste(RSLT_DIR, "/dataframe_predict.csv", sep = '')
-R_CSV_PRED <- paste(RSLT_DIR , "/random_effect_predict.csv", sep = '')
+TSTEP <- "temps"
+SUBJECT <- "individus"
+INTRCPT <- "intercept"
 
+PY_CSV_PRED <- "dataframe_predict.csv"
+R_RDS_BEST <- "best_random_hlme.Rds"
+R_CSV_PRED <- "random_effect_predict.csv"
+
+forecast <- function(model, data) {
+  temps <- unique(data[, TSTEP])
+  x_labels <- model$Xnames
+  data[, INTRCPT] <- 1
+  # initialization with the (intercept) marginal effect
+  pred <- as.vector(predictY(model, newdata = data, marg = TRUE)$pred)
+  #############
+  # Checked that it does not change anything
+  # (SUBJECT from test not matched with SUBJECT from train)
+  # youpi1 <- predictY(model, newdata = data, marg = FALSE)$pred
+  # data[SUBJECT] <- data[SUBJECT] * 1000
+  # youpi2 <- predictY(model, newdata = data, marg = FALSE)$pred
+  # if (any(youpi1['pred_ss1'] != youpi2['pred_ss1'])) {
+  #   stop("youhou!")
+  # }
+  ###########
+  for (t in temps[-1]) {
+    # a verification has been done with "prev_data <- data"
+    # to use all the data as with predictY
+    # and… we get the same results as with predictY
+    # (except for t=0 of course)
+    prev_data <- data[data[TSTEP] < t, ]
+    ui <- predictRE(model, prev_data)
+    #########
+    if (nrow(data[data[TSTEP] == t, ]) != nrow(ui)) {
+      stop("youhou")
+    }
+    #############
+    # checking the order so we can simply multiply the x's and the ui's
+    if (any(data[data[TSTEP] == t, ][SUBJECT] != ui[SUBJECT])) {
+      stop("This is an error message!")
+    }
+    # addition of the random effects
+    reffects <- rowSums(data[data[TSTEP] == t, x_labels] * ui[, x_labels])
+    pred[data[TSTEP] == t] <- pred[data[TSTEP] == t] + reffects
+  }
+  return(pred)
+}
 
 ####
 random_hlme <- readRDS(R_RDS_BEST)
-
-data <- read.csv2(PY_CSV_PRED, sep = ',', dec = '.')
-
-# https://www.rdocumentation.org/packages/lcmm/versions/2.1.0/topics/predictY
-# prediction <- predictY(random_hlme, newdata = data, marg = FALSE)
-# write.table(
-#   prediction$pred,
-#   R_CSV_PRED,
-#   sep = ",",
-#   dec = ".",
-#   row.names = FALSE
-# )
-# write.table(
-#   prediction$pred,
-#   R_CSV_PRED,
-#   sep = ",",
-#   dec = ".",
-#   row.names = FALSE
-# )
-
-
-# NO MORE CHEATING FOR 2025
-xnames = paste0("x", 1:8)
-temps <- unique(data$temps)
-
-# initialization with the (intercept) marginal effect
-data$pred <- as.vector(predictY(random_hlme, newdata = data, marg = TRUE)$pred)
-for (t in temps[-1:-1]) {
-  # a verification has been done with "prev_data <- data"
-  # we get the same results as with the original calculation (except for t=0 of course) 
-  prev_data <- data[data$temps < t, ]
-  ui <- predictRE(random_hlme, prev_data)
-
-  # checking the order so we can simply multiply the x's and the ui's
-  if (any(data[data$temps == t,]$individus != reffect$individus)) {
-    stop("This is an error message")
-  }
-  # addition of the intercept random effect
-  data$pred[data$temps == t] <- data$pred[data$temps == t] + reffect$intercept
-  data$pred[data$temps == t] <- data$pred[data$temps == t] + rowSums(data[data$temps == t, xnames] *  ui[, xnames])
-}
-
-write.table(
-  data$pred,
-  R_CSV_PRED,
-  sep = ",",
-  dec = ".",
-  row.names = FALSE
-)
+data_test <- read.csv(PY_CSV_PRED)
+preds <- forecast(random_hlme, data_test)
+write.csv(preds, R_CSV_PRED, row.names = FALSE)

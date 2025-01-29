@@ -169,7 +169,7 @@ def run_optimization(opti_idx: int) -> None:
     )
 
     scaler = SCALER()
-    all_labels = [SERIES, TSTEPS] + X_LABELS + [Y_LABEL]
+    all_labels = X_LABELS + [Y_LABEL]
 
     #
     if opti_idx == 1:
@@ -181,8 +181,8 @@ def run_optimization(opti_idx: int) -> None:
     else:
         raise UserWarning("Asshole!")
 
-    df_train_scaled = DataFrame(columns=all_labels)
-    df_test_scaled = DataFrame(columns=all_labels)
+    df_train_scaled = df_1
+    df_test_scaled = df_2
     df_train_scaled[all_labels] = scaler.fit_transform(df_train[all_labels])
     df_test_scaled[all_labels] = scaler.transform(df_test[all_labels])
 
