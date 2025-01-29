@@ -13,8 +13,8 @@ set.seed(0)
 
 ########
 # fake value for linter it is actually imported by the source command
-X_LABELS <- c("")
-Y_LABEL <- ""
+X_LABELS <- c("fake value for linter")
+Y_LABEL <- "fake value for linter"
 source(file = "study_config.R")
 #######
 DATA_FOLDER <- "../../../data/synthetic_bph_1/"
