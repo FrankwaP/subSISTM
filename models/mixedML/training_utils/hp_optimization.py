@@ -79,7 +79,7 @@ set_verbosity(DEBUG)
 # %%
 
 
-def _get_trial_model(trial: Trial) -> MixedMLEstimator:
+def _get_trial_model(trial: Trial, study_name: str) -> MixedMLEstimator:
     reservoir_dict = dict(
         units=trial.suggest_int("N", 5, 500),
         sr=trial.suggest_float("sr", 1e-4, 1e1, log=True),
@@ -92,17 +92,20 @@ def _get_trial_model(trial: Trial) -> MixedMLEstimator:
         ridge=trial.suggest_float("ridge", 1e-8, 1e2, log=True),
     )
     return MixedMLEstimator(
-        ReservoirEnsemble(reservoir_dict, ridge_dict), recurrent_model=True
+        ReservoirEnsemble(reservoir_dict, ridge_dict),
+        recurrent_model=True,
+        specific_dir=study_name,
     )
 
 
 def _optuna_objective(
     trial: Trial,
+    study_name: str,
     df_train_scaled: DataFrame,
     df_val_scaled: DataFrame,
 ) -> tuple[float, int]:
 
-    model = _get_trial_model(trial)
+    model = _get_trial_model(trial, study_name)
     model.fit(
         df_train_scaled,
         n_iter_improv=1,
@@ -152,6 +155,7 @@ def _run_study(
     study.optimize(
         lambda x: _optuna_objective(
             x,
+            study_name,
             df_train_scaled,
             df_val_scaled,
         ),
@@ -168,9 +172,6 @@ def run_optimization(opti_idx: int) -> None:
         "../../../../data/synthetic_bph_1/simulation2.csv", X_LABELS, [Y_LABEL]
     )
 
-    scaler = SCALER()
-    all_labels = X_LABELS + [Y_LABEL]
-
     #
     if opti_idx == 1:
         study_name = "HP-optimization-01"  # !!!
@@ -181,8 +182,11 @@ def run_optimization(opti_idx: int) -> None:
     else:
         raise UserWarning("Asshole!")
 
-    df_train_scaled = df_1
-    df_test_scaled = df_2
+    scaler = SCALER()
+    all_labels = X_LABELS + [Y_LABEL]
+
+    df_train_scaled = df_train.copy()
+    df_test_scaled = df_test.copy()
     df_train_scaled[all_labels] = scaler.fit_transform(df_train[all_labels])
     df_test_scaled[all_labels] = scaler.transform(df_test[all_labels])
 
