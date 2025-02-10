@@ -17,14 +17,14 @@ fit <- function(random, subject, time, idiag = FALSE, cor = NULL, maxiter = 50) 
     # a previous iteration exist
     {
       previous_hlme <- readRDS(mixed_model_rds)
-      print("Loading previously trained model.")
+      cat("Loading previously trained model.\n")
       B_init <- previous_hlme$best
       B_init
     },
     # first iteration: we call HLME to get the default B_init
     # "warning" works better than "error"
     warning = function(e) {
-      print("First iteration with a new model.")
+      cat("First iteration with a new model.\n")
       random_hlme <- hlme(
         e_fixed ~ 1,
         random = random,
@@ -37,8 +37,8 @@ fit <- function(random, subject, time, idiag = FALSE, cor = NULL, maxiter = 50) 
       return(B_init)
     }
   )
-  print("B_init:")
-  print(round(B_init,2))
+  cat("\tB_init:", round(B_init, 2), "\n")
+
 
   command <- substitute(hlme(
     e_fixed ~ 1,
