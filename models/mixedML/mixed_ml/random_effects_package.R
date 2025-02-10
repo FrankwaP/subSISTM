@@ -1,4 +1,4 @@
-library(this.path)
+suppressWarnings(suppressMessages(library(this.path)))
 library(ini)
 library(lcmm)
 
@@ -37,39 +37,22 @@ fit <- function(random, subject, time, idiag = FALSE, cor = NULL, maxiter = 50) 
       return(B_init)
     }
   )
-
   print("B_init:")
-  print(B_init)
+  print(round(B_init,2))
 
-  # DEMANDER DE L'AIDE POUR ÉVITER LE IF/ELSE
-  if (is.null(cor)) {
-    random_hlme <- hlme(
-      e_fixed ~ 1,
-      random = random,
-      # cor = cor, # AR(temps) ou BM(temps)
-      idiag = idiag,
-      data = data,
-      subject = subject,
-      var.time = time,
-      B = B_init,
-      posfix = c(1),
-      maxiter = maxiter
-    )
-  } else {
-    random_hlme <- hlme(
-      e_fixed ~ 1,
-      random = random,
-      cor = cor, # AR(temps) ou BM(temps)
-      idiag = idiag,
-      data = data,
-      subject = subject,
-      var.time = time,
-      B = B_init,
-      posfix = c(1),
-      maxiter = maxiter
-    )
-  }
-
+  command <- substitute(hlme(
+    e_fixed ~ 1,
+    random = random,
+    # cor = cor, # AR(temps) ou BM(temps)
+    idiag = idiag,
+    data = data,
+    subject = subject,
+    var.time = time,
+    B = B_init,
+    posfix = c(1),
+    maxiter = maxiter
+  ))
+  random_hlme <- eval(command)
 
   write.csv(
     random_hlme$pred["pred_ss"],
@@ -79,22 +62,18 @@ fit <- function(random, subject, time, idiag = FALSE, cor = NULL, maxiter = 50) 
   saveRDS(random_hlme, mixed_model_rds)
 }
 
-
-
-
 forecast <- function(subject, time) {
-  
   fixed_effects_csv <- config$PREDICTION$fixed_effects_csv
   random_effects_results <- config$PREDICTION$random_effects_csv
   mixed_model_rds <- config$PREDICTION$mixed_model_rds
-  
+
   data <- read.csv(fixed_effects_csv)
   tsteps <- unique(data[, time])
   model <- readRDS(mixed_model_rds)
   x_labels <- model$Xnames
-  INTRCPT = model$Xnames[1]
+  INTRCPT <- model$Xnames[1]
 
-  data[, INTRCPT] <- 1  # trick to simplify the RE 'rowSums' calculation
+  data[, INTRCPT] <- 1 # trick to simplify the RE 'rowSums' calculation
   # computing the marginal effects
   # !!!!!!!!!!!! Erreur dans x$call$random[2] : objet de type 'symbol' non indiçable
   pred_marg <- as.vector(predictY(model, newdata = data, marg = TRUE)$pred)
@@ -131,22 +110,16 @@ forecast <- function(subject, time) {
     reffects <- rowSums(data[data[time] == t, x_labels] * ui[, x_labels])
     pred_me[data[time] == t] <- pred_me[data[time] == t] + reffects
   }
-  data[,'pred_mixed'] <- pred_me
-  data[,'pred_fixed'] <- pred_marg
+  data[, "pred_mixed"] <- pred_me
+  data[, "pred_fixed"] <- pred_marg
   write.csv(data, random_effects_results, row.names = FALSE)
 }
 
 
 
 #################### TEST
-
-
-# fit(
-#   random = ~ 1 + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
-#   subject = SUBJECT, time = TSTEP, idiag = TRUE,
-# )
-
-
+fit(
+  random = ~ 1 + x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8,
+  subject = SUBJECT, time = TSTEP, idiag = TRUE,
+)
 forecast(subject = SUBJECT, time = TSTEP)
-
-
