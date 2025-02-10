@@ -227,33 +227,37 @@ class MixedMLEstimator:
         log_dict_list = []
         while True:
             print(f"mixedML step #{istep:02d}")
-            df, metric = self._fit_iteration(df, fixed_model_fit_options)
-            log_dict = {"step": istep, "metric": metric}
-            if trial_for_pruning:
-                log_dict["trial"] = trial_for_pruning.number
-            log_dict_list.append(log_dict)
-            print(f"\tresulting MSE: {metric:8e}", end="")
-            #
-            test_best_metric = best_metric
-            if metric < test_best_metric:
-                best_metric = metric
-                best_ml_fixed = deepcopy(self.ml_fixed)
-                Path(R_RDS).rename(R_RDS_BEST)
-            if metric < (1 - min_rltv_imrov) * test_best_metric:
-                print("")
-                n_it_no_improv = 0
-            else:
-                print(" (no improvement)")
-                n_it_no_improv += 1
-                if n_it_no_improv > n_iter_improv:
-                    break
-            #
-            if trial_for_pruning:
-                trial_for_pruning.report(metric, istep)
-                # Handle pruning based on the intermediate value.
-                if trial_for_pruning.should_prune():
-                    raise TrialPruned()
-            istep += 1
+            try:
+                df, metric = self._fit_iteration(df, fixed_model_fit_options)
+                log_dict = {"step": istep, "metric": metric}
+                if trial_for_pruning:
+                    log_dict["trial"] = trial_for_pruning.number
+                log_dict_list.append(log_dict)
+                print(f"\tresulting MSE: {metric:8e}", end="")
+                #
+                test_best_metric = best_metric
+                if metric < test_best_metric:
+                    best_metric = metric
+                    best_ml_fixed = deepcopy(self.ml_fixed)
+                    Path(R_RDS).rename(R_RDS_BEST)
+                if metric < (1 - min_rltv_imrov) * test_best_metric:
+                    print("")
+                    n_it_no_improv = 0
+                else:
+                    print(" (no improvement)")
+                    n_it_no_improv += 1
+                    if n_it_no_improv >= n_iter_improv:
+                        break
+                #
+                if trial_for_pruning:
+                    trial_for_pruning.report(metric, istep)
+                    # Handle pruning based on the intermediate value.
+                    if trial_for_pruning.should_prune():
+                        raise TrialPruned()
+                istep += 1
+            except ValueError:  # Infinite parameter from LCMM
+                print("ERROR IN CONVERGENCE!!! THE ACTUAL BEST MODEL IS KEPT.")
+                break
         #
         self.ml_fixed = best_ml_fixed
         dump(best_ml_fixed, PY_JBLB_BEST)
