@@ -1,0 +1,6 @@
+\beamer@sectionintoc {1}{Introduction}{3}{0}{1}
+\beamer@subsectionintoc {1}{1}{Context of the study}{3}{0}{1}
+\beamer@subsectionintoc {1}{2}{The data}{4}{0}{1}
+\beamer@sectionintoc {2}{Mixed Models}{12}{0}{2}
+\beamer@sectionintoc {3}{Reservoir Computing}{17}{0}{3}
+\beamer@sectionintoc {4}{MixedML approach}{25}{0}{4}
